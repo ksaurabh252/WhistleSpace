@@ -9,6 +9,7 @@ import {
   AlertIcon,
   VStack,
   Text,
+  Spinner,
 } from '@chakra-ui/react'
 import { useState } from 'react'
 import axios from 'axios'
@@ -21,6 +22,7 @@ function SubmitPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [showConfetti, setShowConfetti] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const { width, height } = useWindowSize()
 
@@ -32,6 +34,7 @@ function SubmitPage() {
     }
 
     try {
+      setLoading(true)
       await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/feedback`, {
         text,
         email,
@@ -46,18 +49,22 @@ function SubmitPage() {
       console.error(err)
       setErrorMsg('Failed to send feedback. Please try again.')
       setSuccessMsg('')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <Container maxW="md" py={12}>
-      {showConfetti && <Confetti width={width} height={height} />}<Heading mb={6}>Submit Feedback</Heading>
+      {showConfetti && <Confetti width={width} height={height} />}
+      <Heading mb={6}>Submit Feedback</Heading>
       <VStack spacing={4} align="stretch">
         <Textarea
           placeholder="Your feedback"
           value={text}
           onChange={(e) => setText(e.target.value)}
           required
+          isDisabled={loading}
         />
         <Text textAlign="right" color={text.length > 500 ? 'red.500' : 'gray.500'}>
           {text.length}/500 chars
@@ -67,8 +74,16 @@ function SubmitPage() {
           placeholder="Optional Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          isDisabled={loading}
         />
-        <Button colorScheme="blue" onClick={handleSubmit}>Submit</Button>
+        <Button
+          colorScheme="blue"
+          onClick={handleSubmit}
+          isLoading={loading}
+          loadingText="Submitting"
+        >
+          Submit
+        </Button>
         {successMsg && (
           <Alert status="success"><AlertIcon />{successMsg}</Alert>
         )}
