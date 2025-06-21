@@ -1,4 +1,3 @@
-// ✅ Updated feedback.js with GET + pagination + search
 const express = require("express");
 const router = express.Router();
 const Feedback = require("../models/Feedback");
@@ -16,8 +15,29 @@ router.post("/", async (req, res) => {
 
 // GET /api/feedback?search=&page=&limit=
 router.get("/", async (req, res) => {
-  const { search = "", page = 1, limit = 5 } = req.query;
-  const query = search ? { text: { $regex: search, $options: "i" } } : {};
+  const {
+    search = "",
+    page = 1,
+    limit = 5,
+    sentiment,
+    category,
+    from,
+    to,
+  } = req.query;
+
+  const query = {
+    ...(search ? { text: { $regex: search, $options: "i" } } : {}),
+    ...(sentiment ? { sentiment } : {}),
+    ...(category ? { category } : {}),
+    ...(from || to
+      ? {
+          timestamp: {
+            ...(from ? { $gte: new Date(from) } : {}),
+            ...(to ? { $lte: new Date(to) } : {}),
+          },
+        }
+      : {}),
+  };
 
   try {
     const total = await Feedback.countDocuments(query);
@@ -26,10 +46,7 @@ router.get("/", async (req, res) => {
       .skip((page - 1) * limit)
       .limit(Number(limit));
 
-    res.json({
-      feedbacks,
-      totalPages: Math.ceil(total / limit),
-    });
+    res.json({ feedbacks, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error retrieving feedbacks" });
