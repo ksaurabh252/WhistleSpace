@@ -1,4 +1,4 @@
-// AdminFeedbackList.jsx
+
 import {
   Box,
   Button,
@@ -15,11 +15,16 @@ import {
   Select,
   Text,
   HStack,
+  Skeleton,
+  IconButton,
+  useBreakpointValue,
+  Flex,
 } from '@chakra-ui/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import axios from 'axios'
 import { saveAs } from 'file-saver'
 import { unparse } from 'papaparse'
+import { FaList, FaChartBar } from 'react-icons/fa'
 
 function highlightMatch(text, keyword) {
   if (!keyword) return text
@@ -32,6 +37,7 @@ function highlightMatch(text, keyword) {
 
 function AdminFeedbackList() {
   const [feedbacks, setFeedbacks] = useState([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -41,28 +47,23 @@ function AdminFeedbackList() {
   const [toDate, setToDate] = useState('')
   const limit = 5
 
-  const fetchFeedbacks = async () => {
-    const params = new URLSearchParams({
-      search,
-      page,
-      limit,
-      sentiment,
-      category,
-      from: fromDate,
-      to: toDate,
-    })
+  const fetchFeedbacks = useCallback(async () => {
+    const params = new URLSearchParams({ search, page, limit, sentiment, category, from: fromDate, to: toDate })
     try {
+      setLoading(true)
       const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/feedback?${params.toString()}`)
       setFeedbacks(res.data.feedbacks || [])
       setTotalPages(res.data.totalPages || 1)
     } catch (err) {
       console.error('Error fetching feedbacks', err)
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [search, page, sentiment, category, fromDate, toDate])
 
   useEffect(() => {
     fetchFeedbacks()
-  }, [search, page, sentiment, category, fromDate, toDate])
+  }, [fetchFeedbacks])
 
   const exportToCSV = () => {
     if (!feedbacks.length) return
@@ -79,8 +80,10 @@ function AdminFeedbackList() {
     saveAs(blob, 'feedbacks.csv')
   }
 
+  const isMobile = useBreakpointValue({ base: true, md: false })
+
   return (
-    <Container maxW="6xl" py={10}>
+    <Container maxW="6xl" py={10} pb={isMobile ? 24 : 10}>
       <Heading mb={4}>Admin Feedback List</Heading>
 
       <Stack direction={{ base: 'column', md: 'row' }} spacing={4} mb={4}>
@@ -91,6 +94,7 @@ function AdminFeedbackList() {
             setSearch(e.target.value)
             setPage(1)
           }}
+          _hover={{ borderColor: 'blue.400' }}
         />
         <Select placeholder="Sentiment" value={sentiment} onChange={(e) => setSentiment(e.target.value)}>
           <option value="Positive">Positive</option>
@@ -104,11 +108,11 @@ function AdminFeedbackList() {
           <option value="Praise">Praise</option>
           <option value="Other">Other</option>
         </Select>
-        <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} placeholder="From date" />
-        <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} placeholder="To date" />
+        <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
       </Stack>
 
-      <Button onClick={exportToCSV} colorScheme="green" size="sm" mb={4}>
+      <Button onClick={exportToCSV} colorScheme="green" size="sm" mb={4} _hover={{ bg: 'green.500' }}>
         Export CSV
       </Button>
 
@@ -125,20 +129,28 @@ function AdminFeedbackList() {
             </Tr>
           </Thead>
           <Tbody>
-            {(feedbacks || []).map((item) => (
-              <Tr key={item._id}>
-                <Td>{highlightMatch(item.text, search)}</Td>
-                <Td>{item.email || 'Anonymous'}</Td>
-                <Td>{item.sentiment || '-'}</Td>
-                <Td>{item.category || '-'}</Td>
-                <Td>{new Date(item.timestamp).toLocaleDateString()}</Td>
-                <Td>
-                  <Button size="sm" isDisabled>
-                    Reply (coming soon)
-                  </Button>
-                </Td>
-              </Tr>
-            ))}
+            {loading ? (
+              [...Array(5)].map((_, i) => (
+                <Tr key={i}>
+                  <Td colSpan={6}><Skeleton height="20px" /></Td>
+                </Tr>
+              ))
+            ) : (
+              feedbacks.map((item) => (
+                <Tr key={item._id} _hover={{ bg: 'gray.50' }}>
+                  <Td>{highlightMatch(item.text, search)}</Td>
+                  <Td>{item.email || 'Anonymous'}</Td>
+                  <Td>{item.sentiment || '-'}</Td>
+                  <Td>{item.category || '-'}</Td>
+                  <Td>{new Date(item.timestamp).toLocaleDateString()}</Td>
+                  <Td>
+                    <Button size="sm" isDisabled>
+                      Reply (coming soon)
+                    </Button>
+                  </Td>
+                </Tr>
+              ))
+            )}
           </Tbody>
         </Table>
       </Box>
@@ -154,6 +166,23 @@ function AdminFeedbackList() {
           </Button>
         ))}
       </Stack>
+
+      {isMobile && (
+        <Flex
+          position="fixed"
+          bottom={0}
+          left={0}
+          right={0}
+          bg="white"
+          borderTop="1px solid #ddd"
+          justify="space-around"
+          py={2}
+          zIndex={1000}
+        >
+          <IconButton icon={<FaList />} aria-label="List" variant="ghost" />
+          <IconButton icon={<FaChartBar />} aria-label="Analytics" variant="ghost" />
+        </Flex>
+      )}
     </Container>
   )
 }
