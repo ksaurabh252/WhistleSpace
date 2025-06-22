@@ -1,4 +1,3 @@
-
 import {
   Box,
   Button,
@@ -19,12 +18,20 @@ import {
   IconButton,
   useBreakpointValue,
   Flex,
+  useToast,
+  useDisclosure,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
 } from '@chakra-ui/react'
 import { useEffect, useState, useCallback } from 'react'
-import axios from 'axios'
 import { saveAs } from 'file-saver'
 import { unparse } from 'papaparse'
-import { FaList, FaChartBar } from 'react-icons/fa'
+import { FaList, FaChartBar, FaTrash, FaSignOutAlt } from 'react-icons/fa'
+import api from '../api'
 
 function highlightMatch(text, keyword) {
   if (!keyword) return text
@@ -45,17 +52,30 @@ function AdminFeedbackList() {
   const [category, setCategory] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [selectedId, setSelectedId] = useState(null)
+  const { isOpen, onOpen, onClose } = useDisclosure()
   const limit = 5
+  const toast = useToast()
 
   const fetchFeedbacks = useCallback(async () => {
-    const params = new URLSearchParams({ search, page, limit, sentiment, category, from: fromDate, to: toDate })
+    const params = new URLSearchParams({
+      search,
+      page,
+      limit,
+      sentiment,
+      category,
+    })
+    if (fromDate) params.append('from', fromDate)
+    if (toDate) params.append('to', toDate)
+
     try {
       setLoading(true)
-      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/feedback?${params.toString()}`)
+      const res = await api.get(`/api/feedback?${params.toString()}`)
       setFeedbacks(res.data.feedbacks || [])
       setTotalPages(res.data.totalPages || 1)
     } catch (err) {
       console.error('Error fetching feedbacks', err)
+      toast({ title: 'Server error fetching feedbacks', status: 'error' })
     } finally {
       setLoading(false)
     }
@@ -64,6 +84,23 @@ function AdminFeedbackList() {
   useEffect(() => {
     fetchFeedbacks()
   }, [fetchFeedbacks])
+
+  const confirmDelete = (id) => {
+    setSelectedId(id)
+    onOpen()
+  }
+
+  const deleteFeedback = async () => {
+    try {
+      await api.delete(`/api/feedback/${selectedId}`)
+      toast({ title: 'Feedback deleted', status: 'success' })
+      fetchFeedbacks()
+    } catch (err) {
+      toast({ title: 'Delete failed', status: 'error' })
+    } finally {
+      onClose()
+    }
+  }
 
   const exportToCSV = () => {
     if (!feedbacks.length) return
@@ -80,11 +117,19 @@ function AdminFeedbackList() {
     saveAs(blob, 'feedbacks.csv')
   }
 
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    window.location.href = '/login'
+  }
+
   const isMobile = useBreakpointValue({ base: true, md: false })
 
   return (
     <Container maxW="6xl" py={10} pb={isMobile ? 24 : 10}>
-      <Heading mb={4}>Admin Feedback List</Heading>
+      <HStack justify="space-between" mb={4}>
+        <Heading>Admin Feedback List</Heading>
+        <Button colorScheme="red" onClick={handleLogout} leftIcon={<FaSignOutAlt />}>Logout</Button>
+      </HStack>
 
       <Stack direction={{ base: 'column', md: 'row' }} spacing={4} mb={4}>
         <Input
@@ -125,7 +170,7 @@ function AdminFeedbackList() {
               <Th>Sentiment</Th>
               <Th>Category</Th>
               <Th>Date</Th>
-              <Th></Th>
+              <Th>Actions</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -144,8 +189,13 @@ function AdminFeedbackList() {
                   <Td>{item.category || '-'}</Td>
                   <Td>{new Date(item.timestamp).toLocaleDateString()}</Td>
                   <Td>
-                    <Button size="sm" isDisabled>
-                      Reply (coming soon)
+                    <Button
+                      size="sm"
+                      colorScheme="red"
+                      leftIcon={<FaTrash />}
+                      onClick={() => confirmDelete(item._id)}
+                    >
+                      Delete
                     </Button>
                   </Td>
                 </Tr>
@@ -166,6 +216,18 @@ function AdminFeedbackList() {
           </Button>
         ))}
       </Stack>
+
+      <Modal isOpen={isOpen} onClose={onClose} isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Confirm Delete</ModalHeader>
+          <ModalBody>Are you sure you want to delete this feedback?</ModalBody>
+          <ModalFooter>
+            <Button onClick={onClose} mr={3}>Cancel</Button>
+            <Button colorScheme="red" onClick={deleteFeedback}>Delete</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
       {isMobile && (
         <Flex
