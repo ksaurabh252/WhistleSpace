@@ -2,15 +2,24 @@ const express = require("express");
 const router = express.Router();
 const Feedback = require("../models/Feedback");
 const { unparse } = require("papaparse");
+const nodemailer = require("nodemailer");
+const verifyToken = require("../middleware/auth.middleware");
 
-// POST /api/feedback
-router.post("/", async (req, res) => {
+// Email setup
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.ADMIN_EMAIL,
+    pass: process.env.ADMIN_EMAIL_PASS,
+  },
+});
+
+router.delete("/:id", verifyToken, async (req, res) => {
   try {
-    const feedback = new Feedback(req.body);
-    const saved = await feedback.save();
-    res.json(saved);
+    await Feedback.findByIdAndDelete(req.params.id);
+    res.json({ message: "Feedback deleted" });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: "Delete failed" });
   }
 });
 
@@ -93,4 +102,42 @@ router.get("/export", async (req, res) => {
   }
 });
 
+// POST /api/feedback
+router.post("/", async (req, res) => {
+  try {
+    const feedback = new Feedback(req.body);
+    const saved = await feedback.save();
+    res.json(saved);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.patch("/:id", async (req, res) => {
+  const { status } = req.body;
+  try {
+    const feedback = await Feedback.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+
+    if (!feedback) return res.status(404).json({ error: "Feedback not found" });
+
+    // Email alert if category is Harassment
+    if (feedback.category === "Harassment") {
+      await transporter.sendMail({
+        from: `"WhistleSpace Alert" <${process.env.ADMIN_EMAIL}>`,
+        to: process.env.ADMIN_EMAIL,
+        subject: "⚠️ Harassment Feedback Submitted",
+        text: `A feedback marked as harassment:\n\n${feedback.text}`,
+      });
+    }
+
+    res.json(feedback);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error updating feedback" });
+  }
+});
 module.exports = router;
