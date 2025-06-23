@@ -4,8 +4,11 @@ const Feedback = require("../models/Feedback");
 const { unparse } = require("papaparse");
 const nodemailer = require("nodemailer");
 const verifyToken = require("../middleware/auth.middleware");
+const { categorize, analyzeSentiment } = require("../utils/ai");
 
-// Email setup
+// -----------------------------
+// Email Transport Configuration
+// -----------------------------
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -14,6 +17,9 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// ----------------------------------
+// DELETE Feedback by ID (Protected)
+// ----------------------------------
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
     await Feedback.findByIdAndDelete(req.params.id);
@@ -23,7 +29,9 @@ router.delete("/:id", verifyToken, async (req, res) => {
   }
 });
 
-// GET /api/feedback?search=&page=&limit=
+// ----------------------------------------------------
+// GET Feedbacks with Filters, Pagination, Search, etc.
+// ----------------------------------------------------
 router.get("/", async (req, res) => {
   const {
     search = "",
@@ -35,9 +43,11 @@ router.get("/", async (req, res) => {
     to,
   } = req.query;
 
+  // Build MongoDB query object based on filters
   const query = {
     ...(search ? { text: { $regex: search, $options: "i" } } : {}),
     ...(sentiment ? { sentiment } : {}),
+    ...(req.query.status ? { status: req.query.status } : {}),
     ...(category ? { category } : {}),
     ...(from || to
       ? {
@@ -52,7 +62,7 @@ router.get("/", async (req, res) => {
   try {
     const total = await Feedback.countDocuments(query);
     const feedbacks = await Feedback.find(query)
-      .sort({ timestamp: -1 })
+      .sort({ timestamp: -1 }) // Recent first
       .skip((page - 1) * limit)
       .limit(Number(limit));
 
@@ -63,6 +73,9 @@ router.get("/", async (req, res) => {
   }
 });
 
+// -----------------------------
+// Export Feedbacks to CSV File
+// -----------------------------
 router.get("/export", async (req, res) => {
   const { search = "", sentiment, category, from, to } = req.query;
 
@@ -83,6 +96,7 @@ router.get("/export", async (req, res) => {
   try {
     const feedbacks = await Feedback.find(query).sort({ timestamp: -1 });
 
+    // Format data for CSV
     const csvData = feedbacks.map((fb) => ({
       Feedback: fb.text,
       Email: fb.email || "Anonymous",
@@ -102,17 +116,32 @@ router.get("/export", async (req, res) => {
   }
 });
 
-// POST /api/feedback
+// ----------------------------------------
+// POST New Feedback (with analysis logic)
+// ----------------------------------------
 router.post("/", async (req, res) => {
   try {
     const feedback = new Feedback(req.body);
-    const saved = await feedback.save();
-    res.json(saved);
+
+    // Optional auto-categorization and sentiment analysis
+    if (!feedback.category) {
+      feedback.category = await categorize(feedback.text);
+    }
+    if (!feedback.sentiment) {
+      feedback.sentiment = await analyzeSentiment(feedback.text);
+    }
+
+    await feedback.save();
+    res.json(feedback);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(err);
+    res.status(500).json({ message: "Error saving feedback" });
   }
 });
 
+// ----------------------------------------------
+// PATCH Feedback by ID (update status + alert)
+// ----------------------------------------------
 router.patch("/:id", async (req, res) => {
   const { status } = req.body;
   try {
@@ -122,9 +151,11 @@ router.patch("/:id", async (req, res) => {
       { new: true }
     );
 
-    if (!feedback) return res.status(404).json({ error: "Feedback not found" });
+    if (!feedback) {
+      return res.status(404).json({ error: "Feedback not found" });
+    }
 
-    // Email alert if category is Harassment
+    // Send alert email if category is Harassment
     if (feedback.category === "Harassment") {
       await transporter.sendMail({
         from: `"WhistleSpace Alert" <${process.env.ADMIN_EMAIL}>`,
@@ -140,4 +171,37 @@ router.patch("/:id", async (req, res) => {
     res.status(500).json({ error: "Error updating feedback" });
   }
 });
+
+// --------------------------------------------------
+// PATCH Feedback Status (Protected by Auth Token)
+// --------------------------------------------------
+router.patch("/:id/status", verifyToken, async (req, res) => {
+  const { status } = req.body;
+  try {
+    const updated = await Feedback.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update status" });
+  }
+});
+
+// --------------------------------------
+// POST a Comment to Specific Feedback
+// --------------------------------------
+router.post("/:id/comments", async (req, res) => {
+  const { text, anonymous = true } = req.body;
+  try {
+    const fb = await Feedback.findById(req.params.id);
+    fb.comments.push({ text, anonymous });
+    await fb.save();
+    res.json({ comments: fb.comments });
+  } catch (err) {
+    res.status(500).json({ error: "Could not add comment" });
+  }
+});
+
 module.exports = router;
