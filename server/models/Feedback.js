@@ -11,6 +11,13 @@ const FeedbackSchema = new mongoose.Schema({
     enum: ["pending", "approved", "rejected"],
     default: "pending",
   },
+  comments: [
+    {
+      text: { type: String, required: true },
+      timestamp: { type: Date, default: Date.now },
+      anonymous: { type: Boolean, default: true },
+    },
+  ],
 });
 
 module.exports = mongoose.model("Feedback", FeedbackSchema);
