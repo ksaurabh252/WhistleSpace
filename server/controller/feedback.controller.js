@@ -1,8 +1,13 @@
 const Feedback = require("../models/Feedback.model");
 const { unparse } = require("papaparse"); // CSV generation
 const nodemailer = require("nodemailer"); // Email sending
-const verifyToken = require("../middleware/auth.middleware");
+// const verifyToken = require("");
 const { categorize, analyzeSentiment } = require("../utils/ai");
+const { NOT_FOUND, BAD_REQUEST, SERVER_ERROR } = require("../utils/errorCodes");
+const {
+  validateFeedback,
+  handleValidationErrors,
+} = require("../middleware/validation.middleware");
 
 // -----------------------------
 // Email Configuration
@@ -132,6 +137,14 @@ async function exportFeedbacks(req, res) {
  * @access Public
  */
 async function submitFeedback(req, res) {
+  // Check if feedback text is provided in the request body
+  if (!req.body.text) {
+    return res.status(BAD_REQUEST).json({
+      error: "Feedback text required",
+      code: "MISSING_TEXT",
+    });
+  }
+
   try {
     const feedback = new Feedback(req.body);
 
@@ -145,10 +158,13 @@ async function submitFeedback(req, res) {
     }
 
     await feedback.save();
-    res.json(feedback);
+    res.status(201).json(feedback);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Error saving feedback" });
+    res.status(500).json({
+      error: "Feedback submission failed",
+      message: "Error saving feedback",
+    });
   }
 }
 
@@ -211,7 +227,7 @@ module.exports = {
   deleteFeedback,
   getFeedbacks,
   exportFeedbacks,
-  submitFeedback,
+  submitFeedback: [validateFeedback, handleValidationErrors, submitFeedback],
   updateFeedbackStatus,
   addComment,
 };
