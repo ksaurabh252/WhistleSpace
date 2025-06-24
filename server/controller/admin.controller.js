@@ -1,6 +1,11 @@
 const bcrypt = require("bcryptjs"); // For password hashing
 const jwt = require("jsonwebtoken"); // For JWT generation
 const Admin = require("../models/Admin.model");
+const {
+  UNAUTHORIZED,
+  SERVER_ERROR,
+  FORBIDDEN,
+} = require("../utils/errorCodes");
 
 // -----------------------------
 // Authentication Controller
@@ -10,6 +15,13 @@ async function login(req, res) {
   // Extract credentials from request
   const { email, password } = req.body;
 
+  if (!email || !password) {
+    return res.status(BAD_REQUEST).json({
+      error: "Missing credentials",
+      code: "MISSING_CREDENTIALS",
+    });
+  }
+
   try {
     // -----------------------------
     // Admin Verification
@@ -18,7 +30,10 @@ async function login(req, res) {
     const admin = await Admin.findOne({ email });
     if (!admin) {
       // Return generic error to prevent email enumeration
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res.status(UNAUTHORIZED).json({
+        error: "Invalid credentials",
+        code: "INVALID_CREDENTIALS",
+      });
     }
 
     // -----------------------------
@@ -28,7 +43,10 @@ async function login(req, res) {
     const isMatch = await bcrypt.compare(password, admin.password);
     if (!isMatch) {
       // Return generic error for security
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res.status(UNAUTHORIZED).json({
+        error: "Invalid credentials",
+        code: "INVALID_CREDENTIALS",
+      });
     }
 
     // -----------------------------
@@ -44,13 +62,17 @@ async function login(req, res) {
     // Return successful response with token
     res.json({ token });
   } catch (err) {
+    res.status(SERVER_ERROR).json({
+      error: "Login failed",
+      code: "LOGIN_ERROR",
+    });
     // -----------------------------
     // Error Handling
     // -----------------------------
 
     console.error("Login error:", err);
 
-    res.status(500).json({ error: "Server error" });
+    res.status(SERVER_ERROR).json({ error: "Server error" });
   }
 }
 
