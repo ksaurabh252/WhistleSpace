@@ -1,10 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middleware/auth.middleware");
-
-// -----------------------------
-// Controller Imports
-// -----------------------------
 const {
   deleteFeedback,
   getFeedbacks,
@@ -12,60 +8,14 @@ const {
   submitFeedback,
   updateFeedbackStatus,
   addComment,
-} = require("../controllers/feedback.controller");
-
-// -----------------------------
-// Route Definitions
-// -----------------------------
-
-/**
- * Feedback Management Routes
- * Base Path: /api/feedback
- */
-
-/**
- * @route DELETE /:id
- * @desc Delete specific feedback
- * @access Private - Requires auth token
- */
-router.delete("/:id", verifyToken, deleteFeedback);
-
-/**
- * @route GET /
- * @desc Get all feedbacks with filtering
- * @access Public
- * @query {
- *   search: string,
- *   page: number,
- *   limit: number,
- *   sentiment: string,
- *   category: string,
- *   from: date,
- *   to: date
- * }
- */
-router.get("/", getFeedbacks);
-
-/**
- * @route GET /export
- * @desc Export feedbacks to CSV
- * @access Public
- * @query {
- *   search: string,
- *   sentiment: string,
- *   category: string,
- *   from: date,
- *   to: date
- * }
- */
-router.get("/export", exportFeedbacks);
+} = require("../controller/feedback.controller");
 
 /**
  * @route POST /
- * @desc Submit new feedback
+ * @desc Submit new feedback (public access)
  * @access Public
  * @body {
- *   text: string,
+ *   text: string (required),
  *   email?: string,
  *   category?: string,
  *   sentiment?: string
@@ -74,37 +24,71 @@ router.get("/export", exportFeedbacks);
 router.post("/", submitFeedback);
 
 /**
- * @route PATCH /:id
- * @desc Update feedback status
- * @access Public
- * @body {
- *   status: string
+ * @route GET /
+ * @desc Get paginated feedbacks (admin access only)
+ * @access Private (Requires JWT token)
+ * @query {
+ *   search?: string,
+ *   page?: number (default: 1),
+ *   limit?: number (default: 5),
+ *   sentiment?: string,
+ *   category?: string,
+ *   from?: Date (ISO format),
+ *   to?: Date (ISO format),
+ *   status?: "pending" | "approved" | "rejected"
  * }
  */
-router.patch("/:id", updateFeedbackStatus);
+router.get("/", verifyToken, getFeedbacks);
+
+/**
+ * @route GET /export
+ * @desc Export feedbacks as CSV (admin access only)
+ * @access Private (Requires JWT token)
+ * @query {
+ *   search?: string,
+ *   sentiment?: string,
+ *   category?: string,
+ *   from?: Date (ISO format),
+ *   to?: Date (ISO format)
+ * }
+ */
+router.get("/export", verifyToken, exportFeedbacks);
+
+/**
+ * @route DELETE /:id
+ * @desc Delete feedback by ID (admin access only)
+ * @access Private (Requires JWT token)
+ * @params {
+ *   id: string (MongoDB ObjectId)
+ * }
+ */
+router.delete("/:id", verifyToken, deleteFeedback);
 
 /**
  * @route PATCH /:id/status
- * @desc Update feedback status (protected)
- * @access Private - Requires auth token
+ * @desc Update feedback status (admin access only)
+ * @access Private (Requires JWT token)
+ * @params {
+ *   id: string (MongoDB ObjectId)
+ * }
  * @body {
- *   status: string
+ *   status: "pending" | "approved" | "rejected" (required)
  * }
  */
 router.patch("/:id/status", verifyToken, updateFeedbackStatus);
 
 /**
  * @route POST /:id/comments
- * @desc Add comment to feedback
- * @access Public
+ * @desc Add a comment to feedback (admin access only)
+ * @access Private (Requires JWT token)
+ * @params {
+ *   id: string (MongoDB ObjectId)
+ * }
  * @body {
- *   text: string,
- *   anonymous?: boolean
+ *   text: string (required),
+ *   anonymous?: boolean (default: true)
  * }
  */
-router.post("/:id/comments", addComment);
+router.post("/:id/comments", verifyToken, addComment);
 
-// -----------------------------
-// Router Export
-// -----------------------------
 module.exports = router;
