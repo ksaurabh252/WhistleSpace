@@ -16,8 +16,14 @@ const AdminSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true,
-    minlength: 8,
+    required: function () {
+      return !this.isGoogleAuth;
+    },
   },
+  isGoogleAuth: { type: Boolean, default: false },
+  googleId: String, // Store Google's unique identifier
+  avatar: String,
+  name: String,
 });
 
 // -----------------------------
