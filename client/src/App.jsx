@@ -3,6 +3,8 @@ import LandingPage from './pages/LandingPage'
 import SubmitPage from './pages/SubmitPage'
 import AdminFeedbackList from './pages/AdminFeedbackList'
 import LoginPage from './pages/LoginPage'
+import SignupPage from './pages/SignupPage'
+
 import PrivateRoute from './components/PrivateRoute'
 import { AuthProvider } from './context/AuthContext'
 
@@ -13,7 +15,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/submit" element={<SubmitPage />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />   <Route path="/login" element={<LoginPage />} />
           <Route path="/admin" element={
             <PrivateRoute>
               <AdminFeedbackList />
