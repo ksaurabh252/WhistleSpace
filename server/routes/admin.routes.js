@@ -3,11 +3,11 @@ const router = express.Router();
 
 // // Import controller functions for admin authentication
 const {
-  signup, // Handles admin registration
-  login, // Handles admin login (both email/password and Google)
+  signup,
+  login,
   validate,
   refreshToken,
-  getUser, // Validates token for logged-in admin
+  getUser,
 } = require("../controller/admin.controller");
 
 // // Middleware to verify JWT tokens
@@ -23,6 +23,23 @@ const { body } = require("express-validator");
 //  * Base Path: /api/admin
 //  * These routes handle admin registration, login, token validation, and Google login.
 //  */
+
+// Test route
+router.get("/test", (req, res) => {
+  res.json({ message: "Admin route works!" });
+});
+
+// /**
+//  * @route   POST /api/admin/login
+//  * @desc    Login admin with email and password
+//  * @access  Public
+//  * @body    {
+//  *   email: string,
+//  *   password: string
+//  * }
+//  * @returns {Object} JWT token
+//  */
+router.post("/login", login);
 
 // /**
 //  * @route   POST /api/admin/google-login
@@ -54,46 +71,30 @@ router.post(
 );
 
 // /**
-//  * @route   POST /api/admin/login
-//  * @desc    Login admin with email and password
-//  * @access  Public
-//  * @body    {
-//  *   email: string,
-//  *   password: string
-//  * }
-//  * @returns {Object} JWT token
-//  */
-router.post("/login", login);
-
-// /**
 //  * @route   GET /api/admin/validate
 //  * @desc    Validate JWT and return admin info
 //  * @access  Protected (requires valid token)
 //  */
 router.get("/validate", verifyToken, validate);
+
 router.get("/users/:userId", getUser);
+
 // /**
 //  * @route   POST /api/admin/refresh-token
 //  * @desc    Issue a new JWT using a refresh token (if implemented)
 //  * @access  Public or Protected (depends on implementation)
 //  * @note    You must define the `refreshToken` handler in your controller
 //  */
-
 router.post("/refresh-token", refreshToken);
-
-// // -----------------------------
-// // Router Export
-// // -----------------------------
-// module.exports = router;
-
-// Test route
-router.get("/test", (req, res) => {
-  res.json({ message: "Admin route works!" });
-});
 
 // Add your actual routes ONE BY ONE below this
 // router.post('/login', login);
 // router.post('/signup', signup);
 // etc...
+
+// // -----------------------------
+// // Router Export
+// // -----------------------------
+// module.exports = router;
 
 module.exports = router;
