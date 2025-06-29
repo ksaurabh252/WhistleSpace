@@ -1,7 +1,6 @@
 // axiosInstance.js
 
 import axios from "axios";
-import { useAuth } from "./context/AuthContext"; // Although imported, not used here—can be removed if unnecessary
 
 // ===============================
 // 📦 Axios Instance Configuration
