@@ -17,6 +17,7 @@ import {
   DrawerCloseButton,
   Stack,
   HStack,
+  useColorModeValue
 } from '@chakra-ui/react'
 import { HamburgerIcon, MoonIcon, SunIcon } from '@chakra-ui/icons'
 import { Link as RouterLink } from 'react-router-dom'
@@ -24,6 +25,8 @@ import { Link as RouterLink } from 'react-router-dom'
 function LandingPage() {
   const { colorMode, toggleColorMode } = useColorMode()
   const { isOpen, onOpen, onClose } = useDisclosure()
+  const bgColor = useColorModeValue('white', 'gray.900')
+  const textColor = useColorModeValue('gray.800', 'white')
 
   const handleScrollTo = (id) => {
     const el = document.getElementById(id)
@@ -32,7 +35,7 @@ function LandingPage() {
 
   return (
     <>
-      <Box bg="gray.800" color="white" py={4} px={8}>
+      <Box bg={bgColor} color={textColor} py={4} px={8} >
         <Flex justify="space-between" align="center">
           <Heading size="md">WhistleSpace</Heading>
           <HStack display={{ base: 'none', md: 'flex' }} gap={4} align="center">
@@ -89,7 +92,7 @@ function LandingPage() {
           </Button>
         </VStack>
 
-        <Box id="features" mt={20}>
+        <Box id="features" mt={20} >
           <Heading size="lg" mb={4}>🔍 Features</Heading>
           <Box as="ul" pl={5} listStyleType="disc">
             <li>Anonymous submissions</li>
