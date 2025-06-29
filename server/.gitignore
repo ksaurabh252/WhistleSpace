@@ -5,6 +5,8 @@
 .env.local
 .env.development
 .env.production
+feedback.routes_.js
+test.routes.js
 
 # Dependency directories
 node_modules/
