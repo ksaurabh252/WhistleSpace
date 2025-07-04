@@ -1,22 +1,46 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Admin = require("../models/Admin.model");
+const { OAuth2Client } = require("google-auth-library");
 const {
   UNAUTHORIZED,
   SERVER_ERROR,
   FORBIDDEN,
   BAD_REQUEST,
 } = require("../utils/errorCodes");
-const { OAuth2Client } = require("google-auth-library");
+
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// 🔐 Utility: Generate JWT token
+const generateToken = (admin) =>
+  jwt.sign({ id: admin._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
+
 /**
- * Handles admin signup (both email/password and Google OAuth)
+ * Sends JWT token along with admin user info
+ *
+ * @param {Object} admin - Admin mongoose document
+ * @param {Object} res - Express response object
+ */
+const sendToken = (admin, res) => {
+  const token = generateToken(admin);
+  res.json({
+    token,
+    user: {
+      id: admin._id,
+      email: admin.email,
+      isGoogleAuth: admin.isGoogleAuth,
+      name: admin.name,
+      avatar: admin.avatar,
+    },
+  });
+};
+
+// 🧑‍💼 Signup
+/**
+ * Handles admin signup (supports both traditional and Google OAuth)
  */
 async function signup(req, res) {
   try {
-    console.log("Signup request body:", req.body); // Add this line
-
     const { email, password, googleToken } = req.body;
 
     if (!email) {
@@ -41,13 +65,14 @@ async function signup(req, res) {
         idToken: googleToken,
         audience: process.env.GOOGLE_CLIENT_ID,
       });
-      const payload = ticket.getPayload();
+
+      const { sub, name, picture } = ticket.getPayload();
 
       admin = await Admin.create({
         email,
-        googleId: payload.sub,
-        name: payload.name,
-        avatar: payload.picture,
+        googleId: sub,
+        name,
+        avatar: picture,
         isGoogleAuth: true,
       });
     } else {
@@ -60,6 +85,7 @@ async function signup(req, res) {
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
+
       admin = await Admin.create({
         email,
         password: hashedPassword,
@@ -67,47 +93,35 @@ async function signup(req, res) {
       });
     }
 
-    const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
-    });
-
-    res.json({
-      token,
-      user: {
-        id: admin._id,
-        email: admin.email,
-        isGoogleAuth: admin.isGoogleAuth,
-        name: admin.name,
-        avatar: admin.avatar,
-      },
-    });
+    sendToken(admin, res);
   } catch (err) {
     console.error("Signup error:", err);
     res.status(SERVER_ERROR).json({
-      error: "Server error during signup",
+      error: "Signup failed",
       code: "SIGNUP_ERROR",
     });
   }
 }
 
+// 🔐 Login
 /**
- * Handles admin login (both email/password and Google OAuth)
+ * Handles admin login (supports both traditional and Google OAuth)
  */
 async function login(req, res) {
   try {
     const { email, password, token: googleToken } = req.body;
 
-    // Google OAuth login flow
     if (googleToken) {
+      // Google OAuth login flow
       const ticket = await client.verifyIdToken({
         idToken: googleToken,
         audience: process.env.GOOGLE_CLIENT_ID,
       });
+
       const { email: googleEmail, name, picture, sub } = ticket.getPayload();
 
       let admin = await Admin.findOne({ email: googleEmail });
 
-      // Auto-create admin if not found (optional)
       if (!admin) {
         admin = await Admin.create({
           email: googleEmail,
@@ -118,23 +132,9 @@ async function login(req, res) {
         });
       }
 
-      const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, {
-        expiresIn: "1d",
-      });
-
-      return res.json({
-        token,
-        user: {
-          id: admin._id,
-          email: admin.email,
-          isGoogleAuth: true,
-          name: admin.name,
-          avatar: admin.avatar,
-        },
-      });
+      return sendToken(admin, res);
     }
 
-    // Traditional email/password login flow
     if (!email || !password) {
       return res.status(BAD_REQUEST).json({
         error: "Email and password required",
@@ -143,33 +143,15 @@ async function login(req, res) {
     }
 
     const admin = await Admin.findOne({ email });
-    if (!admin) {
+
+    if (!admin || !(await bcrypt.compare(password, admin.password))) {
       return res.status(UNAUTHORIZED).json({
         error: "Invalid credentials",
         code: "INVALID_CREDENTIALS",
       });
     }
 
-    const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch) {
-      return res.status(UNAUTHORIZED).json({
-        error: "Invalid credentials",
-        code: "INVALID_CREDENTIALS",
-      });
-    }
-
-    const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
-    });
-
-    res.json({
-      token,
-      user: {
-        id: admin._id,
-        email: admin.email,
-        isGoogleAuth: admin.isGoogleAuth,
-      },
-    });
+    sendToken(admin, res);
   } catch (err) {
     console.error("Login error:", err);
     res.status(SERVER_ERROR).json({
@@ -179,12 +161,14 @@ async function login(req, res) {
   }
 }
 
+// 🔄 Refresh Token
 /**
- * Refreshes JWT token
+ * Refreshes JWT token for authenticated admin
  */
 async function refreshToken(req, res) {
   try {
     const admin = await Admin.findById(req.admin.id);
+
     if (!admin) {
       return res.status(UNAUTHORIZED).json({
         error: "Admin not found",
@@ -192,11 +176,8 @@ async function refreshToken(req, res) {
       });
     }
 
-    const newToken = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
-    });
-
-    res.json({ token: newToken });
+    const token = generateToken(admin);
+    res.json({ token });
   } catch (err) {
     console.error("Refresh token error:", err);
     res.status(FORBIDDEN).json({
@@ -206,20 +187,29 @@ async function refreshToken(req, res) {
   }
 }
 
+// ✅ Validate Session
 /**
- * Validates admin token
+ * Returns current authenticated admin session data
  */
-async function validate(req, res) {
+const validate = (req, res) => {
   res.json({
     user: {
       id: req.admin.id,
       email: req.admin.email,
+      name: req.admin.name,
+      avatar: req.admin.avatar,
     },
   });
-}
+};
+
+// 👤 Get Admin
+/**
+ * Retrieves admin details by ID
+ */
 async function getUser(req, res) {
   try {
     const admin = await Admin.findById(req.params.userId);
+
     if (!admin) {
       return res.status(404).json({
         error: "Admin not found",
@@ -227,7 +217,6 @@ async function getUser(req, res) {
       });
     }
 
-    // Return safe user data (without password)
     res.json({
       id: admin._id,
       email: admin.email,
@@ -243,10 +232,11 @@ async function getUser(req, res) {
     });
   }
 }
+
 module.exports = {
   signup,
   login,
-  validate,
   refreshToken,
+  validate,
   getUser,
 };
