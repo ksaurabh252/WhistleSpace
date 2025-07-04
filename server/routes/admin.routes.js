@@ -10,6 +10,8 @@ const {
   getUser,
 } = require("../controller/admin.controller");
 
+const { googleLogin } = require("../controller/admin.controller");
+const verifyToken = require("../controller/auth.controller");
 // // Middleware to verify JWT tokens
 const verifyToken = require("../middleware/auth.middleware");
 const { body } = require("express-validator");
@@ -48,7 +50,7 @@ router.post("/login", login);
 //  * @body    { credential: string } — Google ID token from client
 //  * @returns {Object} JWT token for app use
 //  */
-router.post("/google-login", login); // Endpoint reused for both standard and Google login
+router.post("/google-login", googleLogin); // Endpoint reused for both standard and Google login
 
 // /**
 //  * @route   POST /api/admin/signup
@@ -95,6 +97,5 @@ router.post("/refresh-token", refreshToken);
 // // -----------------------------
 // // Router Export
 // // -----------------------------
-// module.exports = router;
 
 module.exports = router;
