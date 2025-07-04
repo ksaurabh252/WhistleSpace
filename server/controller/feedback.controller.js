@@ -1,9 +1,8 @@
 const Feedback = require("../models/Feedback.model");
-const { unparse } = require("papaparse"); // CSV generation
-const nodemailer = require("nodemailer"); // Email sending
-// const verifyToken = require("");
 const { categorize, analyzeSentiment } = require("../utils/ai");
-const { NOT_FOUND, BAD_REQUEST, SERVER_ERROR } = require("../utils/errorCodes");
+const { unparse } = require("papaparse"); // CSV export
+const nodemailer = require("nodemailer"); // Email sending
+const { BAD_REQUEST, SERVER_ERROR, NOT_FOUND } = require("../utils/errorCodes");
 const {
   validateFeedback,
   handleValidationErrors,
@@ -21,8 +20,85 @@ const transporter = nodemailer.createTransport({
 });
 
 // -----------------------------
-// Feedback Controllers
+// Helper: Query Builder
 // -----------------------------
+/**
+ * Builds a MongoDB query object from filter parameters
+ */
+function buildQuery({ search = "", sentiment, category, from, to, status }) {
+  return {
+    ...(search && { text: { $regex: search, $options: "i" } }),
+    ...(sentiment && { sentiment }),
+    ...(category && { category }),
+    ...(status && { status }),
+    ...(from || to
+      ? {
+          timestamp: {
+            ...(from && { $gte: new Date(from) }),
+            ...(to && { $lte: new Date(to) }),
+          },
+        }
+      : {}),
+  };
+}
+
+// -----------------------------
+// Controllers
+// -----------------------------
+
+/**
+ * Submit new feedback
+ * @route POST /api/feedback
+ * @access Public
+ */
+async function submitFeedbackHandler(req, res) {
+  if (!req.body.text) {
+    return res.status(BAD_REQUEST).json({
+      error: "Feedback text required",
+      code: "MISSING_TEXT",
+    });
+  }
+
+  try {
+    const data = req.body;
+
+    data.category ||= await categorize(data.text);
+    data.sentiment ||= await analyzeSentiment(data.text);
+
+    const feedback = await new Feedback(data).save();
+    res.status(201).json(feedback);
+  } catch (err) {
+    console.error("Feedback error:", err);
+    res.status(SERVER_ERROR).json({
+      error: "Feedback submission failed",
+      message: "Error saving feedback",
+    });
+  }
+}
+
+/**
+ * Get feedbacks with filtering and pagination
+ * @route GET /api/feedback
+ * @access Public
+ */
+async function getFeedbacks(req, res) {
+  try {
+    const { page = 1, limit = 5, ...filters } = req.query;
+    const query = buildQuery(filters);
+
+    const total = await Feedback.countDocuments(query);
+    const feedbacks = await Feedback.find(query)
+      .sort({ timestamp: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .lean();
+
+    res.json({ feedbacks, totalPages: Math.ceil(total / limit) });
+  } catch (err) {
+    console.error("Fetch error:", err);
+    res.status(SERVER_ERROR).json({ error: "Error retrieving feedbacks" });
+  }
+}
 
 /**
  * Delete feedback by ID
@@ -34,148 +110,20 @@ async function deleteFeedback(req, res) {
     await Feedback.findByIdAndDelete(req.params.id);
     res.json({ message: "Feedback deleted" });
   } catch (err) {
-    res.status(500).json({ error: "Delete failed" });
+    console.error("Delete error:", err);
+    res.status(SERVER_ERROR).json({ error: "Delete failed" });
   }
 }
 
 /**
- * Get feedbacks with filtering and pagination
- * @route GET /api/feedback
- * @access Public
- */
-async function getFeedbacks(req, res) {
-  // Extract query parameters with defaults
-  const {
-    search = "",
-    page = 1,
-    limit = 5,
-    sentiment,
-    category,
-    from,
-    to,
-  } = req.query;
-
-  // Build MongoDB query object
-  const query = {
-    ...(search ? { text: { $regex: search, $options: "i" } } : {}),
-    ...(sentiment ? { sentiment } : {}),
-    ...(req.query.status ? { status: req.query.status } : {}),
-    ...(category ? { category } : {}),
-    ...(from || to
-      ? {
-          timestamp: {
-            ...(from ? { $gte: new Date(from) } : {}),
-            ...(to ? { $lte: new Date(to) } : {}),
-          },
-        }
-      : {}),
-  };
-
-  try {
-    // Get total count and paginated results
-    const total = await Feedback.countDocuments(query);
-    const feedbacks = await Feedback.find(query)
-      .sort({ timestamp: -1 })
-      .skip((page - 1) * limit)
-      .limit(Number(limit));
-
-    res.json({ feedbacks, totalPages: Math.ceil(total / limit) });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error retrieving feedbacks" });
-  }
-}
-
-/**
- * Export feedbacks to CSV
- * @route GET /api/feedback/export
- * @access Private
- */
-async function exportFeedbacks(req, res) {
-  const { search = "", sentiment, category, from, to } = req.query;
-
-  // Build query object
-  const query = {
-    ...(search ? { text: { $regex: search, $options: "i" } } : {}),
-    ...(sentiment ? { sentiment } : {}),
-    ...(category ? { category } : {}),
-    ...(from || to
-      ? {
-          timestamp: {
-            ...(from ? { $gte: new Date(from) } : {}),
-            ...(to ? { $lte: new Date(to) } : {}),
-          },
-        }
-      : {}),
-  };
-
-  try {
-    // Get and format feedback data
-    const feedbacks = await Feedback.find(query).sort({ timestamp: -1 });
-    const csvData = feedbacks.map((fb) => ({
-      Feedback: fb.text,
-      Email: fb.email || "Anonymous",
-      Sentiment: fb.sentiment || "-",
-      Category: fb.category || "-",
-      Date: new Date(fb.timestamp).toLocaleDateString(),
-    }));
-
-    // Generate and send CSV
-    const csv = unparse(csvData);
-    res.header("Content-Type", "text/csv");
-    res.attachment("feedbacks.csv");
-    return res.send(csv);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to export feedbacks" });
-  }
-}
-
-/**
- * Submit new feedback
- * @route POST /api/feedback
- * @access Public
- */
-async function submitFeedback(req, res) {
-  // Check if feedback text is provided in the request body
-  if (!req.body.text) {
-    return res.status(BAD_REQUEST).json({
-      error: "Feedback text required",
-      code: "MISSING_TEXT",
-    });
-  }
-
-  try {
-    const feedback = new Feedback(req.body);
-
-    // Auto-categorize if not provided
-    if (!feedback.category) {
-      feedback.category = await categorize(feedback.text);
-    }
-    // Auto-analyze sentiment if not provided
-    if (!feedback.sentiment) {
-      feedback.sentiment = await analyzeSentiment(feedback.text);
-    }
-
-    await feedback.save();
-    res.status(201).json(feedback);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Feedback submission failed",
-      message: "Error saving feedback",
-    });
-  }
-}
-
-/**
- * Update feedback status
+ * Update feedback status and send alert for harassment
  * @route PATCH /api/feedback/:id
  * @access Private
  */
 async function updateFeedbackStatus(req, res) {
-  const { status } = req.body;
   try {
+    const { status } = req.body;
+
     const feedback = await Feedback.findByIdAndUpdate(
       req.params.id,
       { status },
@@ -183,10 +131,10 @@ async function updateFeedbackStatus(req, res) {
     );
 
     if (!feedback) {
-      return res.status(404).json({ error: "Feedback not found" });
+      return res.status(NOT_FOUND).json({ error: "Feedback not found" });
     }
 
-    // Send alert for harassment feedback
+    // Send alert if feedback is marked as harassment
     if (feedback.category === "Harassment") {
       await transporter.sendMail({
         from: `"WhistleSpace Alert" <${process.env.ADMIN_EMAIL}>`,
@@ -198,36 +146,75 @@ async function updateFeedbackStatus(req, res) {
 
     res.json(feedback);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error updating feedback" });
+    console.error("Status update error:", err);
+    res.status(SERVER_ERROR).json({ error: "Error updating feedback" });
   }
 }
 
 /**
- * Add comment to feedback
+ * Export feedbacks as CSV file
+ * @route GET /api/feedback/export
+ * @access Private
+ */
+async function exportFeedbacks(req, res) {
+  try {
+    const query = buildQuery(req.query);
+    const feedbacks = await Feedback.find(query).sort({ timestamp: -1 }).lean();
+
+    const csvData = feedbacks.map((fb) => ({
+      Feedback: fb.text,
+      Email: fb.email || "Anonymous",
+      Sentiment: fb.sentiment || "-",
+      Category: fb.category || "-",
+      Date: new Date(fb.timestamp).toLocaleDateString(),
+    }));
+
+    const csv = unparse(csvData);
+    res.header("Content-Type", "text/csv");
+    res.attachment("feedbacks.csv");
+    res.send(csv);
+  } catch (err) {
+    console.error("Export error:", err);
+    res.status(SERVER_ERROR).json({ error: "Failed to export feedbacks" });
+  }
+}
+
+/**
+ * Add a comment to feedback
  * @route POST /api/feedback/:id/comments
  * @access Public
  */
 async function addComment(req, res) {
-  const { text, anonymous = true } = req.body;
   try {
-    const fb = await Feedback.findById(req.params.id);
-    fb.comments.push({ text, anonymous });
-    await fb.save();
-    res.json({ comments: fb.comments });
+    const { text, anonymous = true } = req.body;
+    const feedback = await Feedback.findById(req.params.id);
+
+    if (!feedback) {
+      return res.status(NOT_FOUND).json({ error: "Feedback not found" });
+    }
+
+    feedback.comments.push({ text, anonymous });
+    await feedback.save();
+
+    res.json({ comments: feedback.comments });
   } catch (err) {
-    res.status(500).json({ error: "Could not add comment" });
+    console.error("Comment error:", err);
+    res.status(SERVER_ERROR).json({ error: "Could not add comment" });
   }
 }
 
 // -----------------------------
-// Controller Exports
+// Module Exports
 // -----------------------------
 module.exports = {
-  deleteFeedback,
+  submitFeedback: [
+    validateFeedback,
+    handleValidationErrors,
+    submitFeedbackHandler,
+  ],
   getFeedbacks,
+  deleteFeedback,
   exportFeedbacks,
-  submitFeedback: [validateFeedback, handleValidationErrors, submitFeedback],
   updateFeedbackStatus,
   addComment,
 };
