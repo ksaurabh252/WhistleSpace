@@ -1,39 +1,42 @@
 const mongoose = require("mongoose");
 
-// -----------------------------
 // Feedback Schema Definition
-// -----------------------------
 const FeedbackSchema = new mongoose.Schema({
   // Core Feedback Content
   text: {
     type: String,
-    required: true, 
+    required: true,
   },
 
   // Contact Information
   email: {
-    type: String, // Optional email for follow-up
+    type: String,
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
   },
 
   // Metadata
   timestamp: {
     type: Date,
-    default: Date.now, // Automatically set creation time
+    default: Date.now,
   },
 
   // AI-Generated Classifications
   category: {
-    type: String, // e.g. "Harassment", "Suggestion", etc.
+    type: String,
   },
   sentiment: {
-    type: String, // e.g. "Positive", "Negative", "Neutral"
+    type: String,
   },
 
   // Moderation Status
   status: {
     type: String,
-    enum: ["pending", "approved", "rejected"],
-    default: "pending", // Initial state
+    enum: ["pending", "approved", "rejected", "under_review"], // Added 'under_review' from Code 2
+    default: "pending",
   },
 
   // Associated Comments
@@ -41,21 +44,52 @@ const FeedbackSchema = new mongoose.Schema({
     {
       text: {
         type: String,
-        required: true, // Comment text is mandatory
+        required: true,
       },
       timestamp: {
         type: Date,
-        default: Date.now, // Automatically set comment time
+        default: Date.now,
       },
       anonymous: {
         type: Boolean,
-        default: true, // Comments anonymous by default
+        default: true,
       },
+      adminId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Admin",
+      },
+    },
+  ],
+
+  // Admin Actions Tracking
+  adminActions: [
+    {
+      action: {
+        type: String,
+        enum: [
+          "flagged",
+          "approved",
+          "rejected",
+          "warning_issued",
+          "user_banned",
+        ],
+      },
+      adminId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Admin",
+      },
+      timestamp: {
+        type: Date,
+        default: Date.now,
+      },
+      notes: String,
     },
   ],
 });
 
-// -----------------------------
-// Model Export
-// -----------------------------
+// Indexes for better query performance
+FeedbackSchema.index({ userId: 1 });
+FeedbackSchema.index({ category: 1 });
+FeedbackSchema.index({ timestamp: -1 });
+
 module.exports = mongoose.model("Feedback", FeedbackSchema);
