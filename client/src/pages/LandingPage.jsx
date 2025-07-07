@@ -17,34 +17,43 @@ import {
   DrawerCloseButton,
   Stack,
   HStack,
-  useColorModeValue
-} from '@chakra-ui/react'
-import { HamburgerIcon, MoonIcon, SunIcon } from '@chakra-ui/icons'
-import { Link as RouterLink } from 'react-router-dom'
+  useColorModeValue,
+} from "@chakra-ui/react";
+import { HamburgerIcon, MoonIcon, SunIcon } from "@chakra-ui/icons";
+import { Link as RouterLink } from "react-router-dom";
 
 function LandingPage() {
-  const { colorMode, toggleColorMode } = useColorMode()
-  const { isOpen, onOpen, onClose } = useDisclosure()
-  const bgColor = useColorModeValue('white', 'gray.900')
-  const textColor = useColorModeValue('gray.800', 'white')
+  const { colorMode, toggleColorMode } = useColorMode();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const bgColor = useColorModeValue("white", "gray.900");
+  const textColor = useColorModeValue("gray.800", "white");
 
   const handleScrollTo = (id) => {
-    const el = document.getElementById(id)
-    if (el) el.scrollIntoView({ behavior: 'smooth' })
-  }
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+  };
 
+  const isActiveRoute = (path) => location.pathname === path;
   return (
     <>
-      <Box bg={bgColor} color={textColor} py={4} px={8} >
+      <Box bg={bgColor} color={textColor} py={4} px={8}>
         <Flex justify="space-between" align="center">
           <Heading size="md">WhistleSpace</Heading>
-          <HStack display={{ base: 'none', md: 'flex' }} gap={4} align="center">
-            <Button variant="ghost" onClick={() => handleScrollTo('features')}>Features</Button>
-            <Button variant="ghost" onClick={() => handleScrollTo('about')}>About</Button>
-            <Button as={RouterLink} to="/submit" variant="ghost">Submit Feedback</Button>
-            <Button as={RouterLink} to="/admin" variant="ghost">Admin Dashboard</Button>
+          <HStack display={{ base: "none", md: "flex" }} gap={4} align="center">
+            <Button variant="ghost" onClick={() => handleScrollTo("features")}>
+              Features
+            </Button>
+            <Button variant="ghost" onClick={() => handleScrollTo("about")}>
+              About
+            </Button>
+            <Button as={RouterLink} to="/submit" variant="ghost">
+              Submit Feedback
+            </Button>
+            <Button as={RouterLink} to="/admin" variant="ghost">
+              Admin Dashboard
+            </Button>
             <IconButton
-              icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
+              icon={colorMode === "light" ? <MoonIcon /> : <SunIcon />}
               onClick={toggleColorMode}
               variant="ghost"
               aria-label="Toggle color mode"
@@ -53,7 +62,7 @@ function LandingPage() {
           <IconButton
             aria-label="Open Menu"
             icon={<HamburgerIcon />}
-            display={{ base: 'flex', md: 'none' }}
+            display={{ base: "flex", md: "none" }}
             onClick={onOpen}
           />
         </Flex>
@@ -61,20 +70,60 @@ function LandingPage() {
 
       <Drawer isOpen={isOpen} placement="right" onClose={onClose}>
         <DrawerOverlay />
-        <DrawerContent bg="gray.700" color="white">
+        <DrawerContent bg={bgColor} color={textColor}>
           <DrawerCloseButton />
           <DrawerHeader>Navigation</DrawerHeader>
           <DrawerBody>
             <Stack spacing={4}>
-              <Button variant="ghost" onClick={() => { handleScrollTo('features'); onClose() }}>Features</Button>
-              <Button variant="ghost" onClick={() => { handleScrollTo('about'); onClose() }}>About</Button>
-              <Button as={RouterLink} to="/submit" variant="ghost" onClick={onClose}>Submit Feedback</Button>
-              <Button as={RouterLink} to="/admin" variant="ghost" onClick={onClose}>Admin Dashboard</Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  handleScrollTo("features");
+                  onClose();
+                }}
+                justifyContent="flex-start"
+              >
+                Features
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  handleScrollTo("about");
+                  onClose();
+                }}
+                justifyContent="flex-start"
+              >
+                About
+              </Button>
+              <Button
+                as={RouterLink}
+                to="/submit"
+                variant="ghost"
+                onClick={onClose}
+                justifyContent="flex-start"
+                colorScheme={isActiveRoute('/submit') ? 'blue' : 'gray'}
+              >
+                Submit Feedback
+              </Button>
+              <Button
+                as={RouterLink}
+                to="/admin"
+                variant="ghost"
+                onClick={onClose}
+                justifyContent="flex-start"
+                colorScheme={isActiveRoute('/admin') ? 'blue' : 'gray'}
+              >
+                Admin Dashboard
+              </Button>
               <IconButton
-                icon={colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
-                onClick={() => { toggleColorMode(); onClose() }}
+                icon={colorMode === "light" ? <MoonIcon /> : <SunIcon />}
+                onClick={() => {
+                  toggleColorMode();
+                  onClose();
+                }}
                 variant="ghost"
                 aria-label="Toggle color mode"
+                alignSelf="flex-start"
               />
             </Stack>
           </DrawerBody>
@@ -92,8 +141,10 @@ function LandingPage() {
           </Button>
         </VStack>
 
-        <Box id="features" mt={20} >
-          <Heading size="lg" mb={4}>🔍 Features</Heading>
+        <Box id="features" mt={20}>
+          <Heading size="lg" mb={4}>
+            🔍 Features
+          </Heading>
           <Box as="ul" pl={5} listStyleType="disc">
             <li>Anonymous submissions</li>
             <li>AI-powered categorization & sentiment</li>
@@ -103,16 +154,18 @@ function LandingPage() {
         </Box>
 
         <Box id="about" mt={20}>
-          <Heading size="lg" mb={4}>📖 About</Heading>
+          <Heading size="lg" mb={4}>
+            📖 About
+          </Heading>
           <Text>
-            WhistleSpace was built to give employees, students, and communities a voice —
-            without risking their privacy. AI auto-tags concerns and filters out noise so
-            admins can take real action.
+            WhistleSpace was built to give employees, students, and communities
+            a voice — without risking their privacy. AI auto-tags concerns and
+            filters out noise so admins can take real action.
           </Text>
         </Box>
       </Container>
     </>
-  )
+  );
 }
 
-export default LandingPage
+export default LandingPage;
