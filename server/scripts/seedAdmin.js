@@ -4,74 +4,114 @@ const Admin = require("../models/Admin.model");
 require("dotenv").config();
 
 /**
- * Creates a default admin user in the database if none exists
- * This script is typically run during initial system setup
+ * Seeds the database with a default admin account (only if none exists).
  *
- * Environment Variables Required:
- * - MONGO_URI: MongoDB connection string
- * - DEFAULT_ADMIN_EMAIL: Email for default admin (optional)
- * - DEFAULT_ADMIN_PASSWORD: Password for default admin (optional)
+ * Required ENV:
+ *   - MONGO_URI                MongoDB connection string
+ * Optional ENV:
+ *   - DEFAULT_ADMIN_EMAIL      Default admin email
+ *   - DEFAULT_ADMIN_PASSWORD   Default admin password
+ *   - DEFAULT_ADMIN_NAME       Default admin display name
  */
 async function createDefaultAdmin() {
   try {
-    // Establish database connection
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("📦 Connected to MongoDB for seeding...");
+    console.log("🔄 Starting default admin creation…");
 
-    // Check for existing admin to prevent duplicate creation
+    // ────────────────────────────────────────────────────────────────
+    // 1. Connect to MongoDB (only if not already connected)
+    // ────────────────────────────────────────────────────────────────
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(process.env.MONGO_URI);
+      console.log("📦 Connected to MongoDB");
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // 2. Abort if any admin already exists
+    // ────────────────────────────────────────────────────────────────
     const existingAdmin = await Admin.findOne({});
     if (existingAdmin) {
-      console.log("✅ Default admin already exists:", existingAdmin.email);
-      await mongoose.disconnect();
+      console.log("✅ Admin already exists:");
+      console.log("📧 Email:", existingAdmin.email);
+      console.log("👤 Name:", existingAdmin.name || "Not set");
+      console.log(
+        "🔑 Default Admin:",
+        existingAdmin.isDefaultAdmin ? "Yes" : "No"
+      );
       return;
     }
 
-    // Set up default admin credentials
-    // Falls back to hardcoded values if environment variables aren't set
-    const defaultAdminEmail =
+    // ────────────────────────────────────────────────────────────────
+    // 3. Gather credentials (env ⟶ fallback defaults)
+    // ────────────────────────────────────────────────────────────────
+    const adminEmail =
       process.env.DEFAULT_ADMIN_EMAIL || "admin@whistlespace.com";
-    const defaultAdminPassword =
-      process.env.DEFAULT_ADMIN_PASSWORD || "Admin123!";
+    const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || "Admin123!";
+    const adminName = process.env.DEFAULT_ADMIN_NAME || "WhistleSpace Admin";
 
-    // Hash password for security
-    const hashedPassword = await bcrypt.hash(defaultAdminPassword, 10);
+    console.log("🔄 Creating default admin…");
 
-    // Create new admin document with default values
+    // ────────────────────────────────────────────────────────────────
+    // 4. Securely hash the password
+    // ────────────────────────────────────────────────────────────────
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(adminPassword, saltRounds);
+
+    // ────────────────────────────────────────────────────────────────
+    // 5. Create the admin user
+    // ────────────────────────────────────────────────────────────────
     const defaultAdmin = await Admin.create({
-      email: defaultAdminEmail,
+      email: adminEmail,
       password: hashedPassword,
-      name: "Default Admin",
+      name: adminName,
       isGoogleAuth: false,
-      isDefaultAdmin: true, // Flag to identify system-created admin
+      isDefaultAdmin: true,
     });
 
-    // Log success information
+    // ────────────────────────────────────────────────────────────────
+    // 6. Success output
+    // ────────────────────────────────────────────────────────────────
     console.log("✅ Default admin created successfully!");
-    console.log("📧 Email:", defaultAdminEmail);
-    console.log("🔑 Password:", defaultAdminPassword);
-    console.log("⚠️  Please change the default password after first login!");
-
-    // Clean up database connection
-    await mongoose.disconnect();
-    console.log("📦 Database connection closed.");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("📧 Email:   ", adminEmail);
+    console.log("🔑 Password:", adminPassword);
+    console.log("👤 Name:    ", adminName);
+    console.log("🆔 Admin ID:", defaultAdmin._id);
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log(
+      "⚠️  IMPORTANT: Change the default password after first login!"
+    );
+    console.log("🔐 Login URL: http://localhost:5173/login");
   } catch (error) {
-    // Error handling
-    console.error("❌ Error creating default admin:", error);
-    await mongoose.disconnect();
-    process.exit(1); // Exit with error code
+    // ────────────────────────────────────────────────────────────────
+    // 7. Error handling
+    // ────────────────────────────────────────────────────────────────
+    console.error("❌ Error creating default admin:");
+    console.error(error.message);
+
+    if (error.code === 11000) {
+      console.log("💡 Tip: An admin with this email already exists");
+    }
+  } finally {
+    // ────────────────────────────────────────────────────────────────
+    // 8. Clean‑up DB connection
+    // ────────────────────────────────────────────────────────────────
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.disconnect();
+      console.log("📦 Database connection closed");
+    }
   }
 }
 
-/**
- * Script execution logic
- * Allows file to be run directly or imported as a module
- *
- * Usage:
- * - Direct execution: node createDefaultAdmin.js
- * - Module import: const createDefaultAdmin = require('./createDefaultAdmin');
- */
+/* ------------------------------------------------------------------ */
+/* Allow script to be executed directly (node createDefaultAdmin.js)  */
+/* ------------------------------------------------------------------ */
 if (require.main === module) {
-  createDefaultAdmin();
+  createDefaultAdmin()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
 }
 
 module.exports = createDefaultAdmin;
