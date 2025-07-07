@@ -233,10 +233,96 @@ async function getUser(req, res) {
   }
 }
 
+async function getAllUsers(req, res) {
+  try {
+    const users = await Admin.find(
+      {},
+      "email warnings banUntil isGoogleAuth createdAt"
+    ).sort({ createdAt: -1 });
+
+    res.json({ users });
+  } catch (err) {
+    console.error("Get users error:", err);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+}
+
+async function banUser(req, res) {
+  try {
+    const { userId } = req.params;
+    const { duration, reason } = req.body;
+
+    const banUntil = new Date();
+    banUntil.setHours(banUntil.getHours() + duration);
+
+    await Admin.findByIdAndUpdate(userId, {
+      banUntil,
+      $push: {
+        banHistory: {
+          bannedBy: req.admin.id,
+          reason,
+          duration,
+          bannedAt: new Date(),
+        },
+      },
+    });
+
+    res.json({ message: "User banned successfully" });
+  } catch (err) {
+    console.error("Ban user error:", err);
+    res.status(500).json({ error: "Failed to ban user" });
+  }
+}
+
+async function unbanUser(req, res) {
+  try {
+    const { userId } = req.params;
+
+    await Admin.findByIdAndUpdate(userId, {
+      banUntil: null,
+    });
+
+    res.json({ message: "User unbanned successfully" });
+  } catch (err) {
+    console.error("Unban user error:", err);
+    res.status(500).json({ error: "Failed to unban user" });
+  }
+}
+
+async function issueWarning(req, res) {
+  try {
+    const { userId } = req.params;
+
+    const user = await Admin.findById(userId);
+    user.warnings += 1;
+
+    // Auto-ban if 3+ warnings
+    if (user.warnings >= 3) {
+      user.banUntil = new Date();
+      user.banUntil.setHours(user.banUntil.getHours() + 24);
+      user.warnings = 0;
+    }
+
+    await user.save();
+
+    res.json({
+      message: "Warning issued successfully",
+      autoBanned: user.warnings === 0,
+    });
+  } catch (err) {
+    console.error("Issue warning error:", err);
+    res.status(500).json({ error: "Failed to issue warning" });
+  }
+}
+
 module.exports = {
   signup,
   login,
   refreshToken,
   validate,
   getUser,
+  getAllUsers,
+  banUser,
+  unbanUser,
+  issueWarning,
 };
