@@ -53,3 +53,6 @@ mongodata/
 *.patch
 .cache/
 .temp/
+# Specific environment files
+client/.env
+server/.env
