@@ -12,10 +12,10 @@ const AdminSchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
   },
-
+  warnings: { type: Number, default: 0 }, // Tracks number of warnings
+  banUntil: { type: Date, default: null }, // Tracks when the user is banned until
   password: {
     type: String,
-    required: true,
     required: function () {
       return !this.isGoogleAuth;
     },
