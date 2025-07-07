@@ -1,13 +1,14 @@
 const Feedback = require("../models/Feedback.model");
-const { categorize, analyzeSentiment } = require("../utils/ai");
+const { categorize, analyzeSentiment } = require("../utils/ai"); // AI utilities
 const { unparse } = require("papaparse"); // CSV export
-const nodemailer = require("nodemailer"); // Email sending
+const nodemailer = require("nodemailer"); // Email sending utility
 const { BAD_REQUEST, SERVER_ERROR, NOT_FOUND } = require("../utils/errorCodes");
 const {
   validateFeedback,
   handleValidationErrors,
 } = require("../middleware/validation.middleware");
 
+const client = require("../utils/redis.client");
 // -----------------------------
 // Email Configuration
 // -----------------------------
@@ -22,8 +23,10 @@ const transporter = nodemailer.createTransport({
 // -----------------------------
 // Helper: Query Builder
 // -----------------------------
+
 /**
  * Builds a MongoDB query object from filter parameters
+ * Used for filtering feedbacks based on search, sentiment, category, etc.
  */
 function buildQuery({ search = "", sentiment, category, from, to, status }) {
   return {
@@ -59,12 +62,51 @@ async function submitFeedbackHandler(req, res) {
     });
   }
 
+  const { userId, text } = req.body;
   try {
-    const data = req.body;
+    // Check for harassment and handle warnings or bans accordingly
+    const harassmentResult = await handleHarassmentWarning(userId, text);
 
+    if (harassmentResult.error) {
+      return res.status(400).json({ error: harassmentResult.error });
+    }
+
+    // Check if the categorization and sentiment are cached in Redis
+
+    const cachedCategory = await new Promise((resolve, reject) => {
+      client.get(`feedback_category:${text}`, (err, result) => {
+        if (err) reject(err);
+        resolve(result);
+      });
+    });
+
+    const cachedSentiment = await new Promise((resolve, reject) => {
+      client.get(`feedback_sentiment:${text}`, (err, result) => {
+        if (err) reject(err);
+        resolve(result);
+      });
+    });
+
+    let category = cachedCategory;
+    let sentiment = cachedSentiment;
+    // If no cache, categorize and analyze sentiment, then cache the result
+    if (!category || !sentiment) {
+      category = await categorize(text);
+      sentiment = await analyzeSentiment(text);
+
+      // Cache the results for future requests
+      client.setex(`feedback_category:${text}`, 3600, category); // Cache for 1 hour (3600 seconds)
+      client.setex(`feedback_sentiment:${text}`, 3600, sentiment); // Cache for 1 hour (3600 seconds)
+    }
+
+    // Prepare feedback data with category and sentiment
+    const data = { ...req.body, category, sentiment };
+
+    // Use AI to auto-categorize and analyze sentiment if not already provided
     data.category ||= await categorize(data.text);
     data.sentiment ||= await analyzeSentiment(data.text);
 
+    // Save feedback to the database
     const feedback = await new Feedback(data).save();
     res.status(201).json(feedback);
   } catch (err) {
@@ -88,10 +130,10 @@ async function getFeedbacks(req, res) {
 
     const total = await Feedback.countDocuments(query);
     const feedbacks = await Feedback.find(query)
-      .sort({ timestamp: -1 })
+      .sort({ timestamp: -1 }) // Sort by most recent
       .skip((page - 1) * limit)
       .limit(Number(limit))
-      .lean();
+      .lean(); // Convert to plain JS objects
 
     res.json({ feedbacks, totalPages: Math.ceil(total / limit) });
   } catch (err) {
@@ -134,7 +176,7 @@ async function updateFeedbackStatus(req, res) {
       return res.status(NOT_FOUND).json({ error: "Feedback not found" });
     }
 
-    // Send alert if feedback is marked as harassment
+    // If feedback is harassment, notify admin by email
     if (feedback.category === "Harassment") {
       await transporter.sendMail({
         from: `"WhistleSpace Alert" <${process.env.ADMIN_EMAIL}>`,
@@ -161,6 +203,7 @@ async function exportFeedbacks(req, res) {
     const query = buildQuery(req.query);
     const feedbacks = await Feedback.find(query).sort({ timestamp: -1 }).lean();
 
+    // Map feedbacks to CSV format
     const csvData = feedbacks.map((fb) => ({
       Feedback: fb.text,
       Email: fb.email || "Anonymous",
@@ -169,7 +212,10 @@ async function exportFeedbacks(req, res) {
       Date: new Date(fb.timestamp).toLocaleDateString(),
     }));
 
+    // Convert to CSV string
     const csv = unparse(csvData);
+
+    // Send CSV file as attachment
     res.header("Content-Type", "text/csv");
     res.attachment("feedbacks.csv");
     res.send(csv);
@@ -193,6 +239,7 @@ async function addComment(req, res) {
       return res.status(NOT_FOUND).json({ error: "Feedback not found" });
     }
 
+    // Push new comment to feedback comments array
     feedback.comments.push({ text, anonymous });
     await feedback.save();
 
@@ -201,6 +248,54 @@ async function addComment(req, res) {
     console.error("Comment error:", err);
     res.status(SERVER_ERROR).json({ error: "Could not add comment" });
   }
+}
+
+/**
+ * Handle harassment warning and user banning logic
+ * @param {string} userId - ID of the user submitting the feedback
+ * @param {string} feedbackText - The feedback text to analyze
+ * @returns {object} Result object with success or error
+ */
+async function handleHarassmentWarning(userId, feedbackText) {
+  // Categorize the feedback using AI
+  const category = await categorize(feedbackText);
+
+  if (category === "Harassment") {
+    const user = await Admin.findById(userId);
+    if (!user) {
+      return { error: "User not found" };
+    }
+
+    // Block feedback submission if user is already banned
+    if (user.banUntil && user.banUntil > new Date()) {
+      return { error: "User is temporarily banned" };
+    }
+
+    // Increment warning count
+    user.warnings += 1;
+
+    // Ban user for 24 hours if 3 warnings are reached
+    if (user.warnings >= 3) {
+      user.banUntil = new Date();
+      user.banUntil.setHours(user.banUntil.getHours() + 24);
+      user.warnings = 0; // Reset warnings after banning
+    }
+
+    // Save updated user state
+    await user.save();
+
+    // Log banning action (optional notification or alert)
+    if (user.warnings === 0) {
+      console.log(
+        `User ${user.username} has been banned until ${user.banUntil}`
+      );
+    }
+
+    return { success: true, message: "Harassment warning issued" };
+  }
+
+  // Return if feedback is not harassment
+  return { success: true, message: "Feedback is not harassment" };
 }
 
 // -----------------------------
