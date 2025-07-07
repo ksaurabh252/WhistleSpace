@@ -1,6 +1,8 @@
 const { OAuth2Client } = require("google-auth-library");
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+const jwt = require("jsonwebtoken");
+const Admin = require("../models/Admin.model");
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 async function googleLogin(req, res) {
   try {
     const { token: googleToken } = req.body;
@@ -44,20 +46,9 @@ async function googleLogin(req, res) {
     });
   } catch (err) {
     console.error("Google auth error:", err);
-
-    let statusCode = 401;
-    let errorMessage = "Google authentication failed";
-
-    if (err.message.includes("Token used too late")) {
-      statusCode = 400;
-      errorMessage = "Expired Google token";
-    } else if (err.message.includes("Audience mismatch")) {
-      errorMessage = "Invalid Google client ID configuration";
-    }
-
-    res.status(statusCode).json({
-      error: errorMessage,
-      ...(process.env.NODE_ENV === "development" && { details: err.message }),
+    res.status(401).json({
+      error: "Google authentication failed",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 }
@@ -100,3 +91,5 @@ async function signup(req, res) {
     res.status(500).json({ error: "Signup failed" });
   }
 }
+
+module.exports = { googleLogin };
