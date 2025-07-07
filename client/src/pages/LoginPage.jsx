@@ -3,20 +3,26 @@ import {
   Box, Button, Container, Flex, FormControl, FormLabel,
   Heading, Input, Link, Stack, Text, useToast,
 } from '@chakra-ui/react'
-import { Link as RouterLink, useNavigate, } from 'react-router-dom'
-import GoogleAuthButton from '../components/auth/GoogleAuthButton';
-// import api from '../api'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import GoogleAuthButton from '../components/auth/GoogleAuthButton'
+
 import { useAuth } from '../context/AuthContext'
-import api from '../api';
+import api from '../api'
 
 export default function LoginPage() {
+  // Local state for email and password fields
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
   const toast = useToast()
   const { login } = useAuth()
   const navigate = useNavigate()
 
+  /**
+   * Runs on mount to check if a valid token already exists.
+   * If valid, user is redirected to the admin dashboard.
+   */
   useEffect(() => {
     const validateToken = async () => {
       const token = localStorage.getItem("token");
@@ -24,19 +30,24 @@ export default function LoginPage() {
         try {
           await api.get("/admin/validate");
           navigate("/admin");
-        } catch (err) {
+        } catch {
           localStorage.removeItem("token");
         }
       }
     };
     validateToken();
-  }, [navigate]);
+  }, [navigate])
+
+  /**
+   * Handles form submission and triggers login process.
+   *
+   * @param {React.FormEvent<HTMLFormElement>} e - Form submit event
+   */
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
 
     const { success, error } = await login(email, password)
-
     setIsSubmitting(false)
 
     if (success) {
@@ -47,7 +58,6 @@ export default function LoginPage() {
         isClosable: true,
         position: 'top'
       })
-
     } else {
       toast({
         title: 'Login failed',
@@ -70,14 +80,17 @@ export default function LoginPage() {
         bg="white"
         _dark={{ bg: 'gray.700' }}
       >
+        {/* Page Heading */}
         <Flex justify="center" mb={8}>
           <Heading size="xl" color="blue.500">
             Admin Login
           </Heading>
         </Flex>
 
+        {/* Login Form */}
         <form onSubmit={handleSubmit}>
           <Stack spacing={4}>
+            {/* Email input */}
             <FormControl id="email" isRequired>
               <FormLabel>Email address</FormLabel>
               <Input
@@ -89,6 +102,7 @@ export default function LoginPage() {
               />
             </FormControl>
 
+            {/* Password input */}
             <FormControl id="password" isRequired>
               <FormLabel>Password</FormLabel>
               <Input
@@ -100,6 +114,7 @@ export default function LoginPage() {
               />
             </FormControl>
 
+            {/* Submit button */}
             <Button
               type="submit"
               colorScheme="blue"
@@ -112,12 +127,15 @@ export default function LoginPage() {
               Log In
             </Button>
           </Stack>
-          <Stack spacing={4} align="center">
+
+          {/* Google Login */}
+          <Stack spacing={4} align="center" mt={4}>
             <Text>Or</Text>
             <GoogleAuthButton />
           </Stack>
         </form>
 
+        {/* Signup link */}
         <Text mt={4} textAlign="center">
           Don't have an account?{' '}
           <Link as={RouterLink} to="/signup" color="blue.500">
