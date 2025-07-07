@@ -1,112 +1,107 @@
-import { GoogleLogin } from "@react-oauth/google";
-import { useToast } from "@chakra-ui/react";
-import { useNavigate } from "react-router-dom";
+import { useCallback } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
+import { useToast } from '@chakra-ui/react';
+import { useNavigate } from 'react-router-dom';
+import api from '../../api';
+import { useAuth } from '../../context/AuthContext';
 
-import api from "../../api";
-import { useAuth } from "../../context/AuthContext";
 
-/**
- * GoogleAuthButton Component
- * 
- * A component that handles Google OAuth authentication flow with features like:
- * - Google One-Tap login integration
- * - Token management and user context update
- * - Error handling with user feedback
- * - Automatic navigation post-authentication
- * 
- * @component
- * @returns {JSX.Element} Rendered GoogleAuthButton component
- */
 export default function GoogleAuthButton() {
-  // Hook Initializations
   const toast = useToast();
   const navigate = useNavigate();
-  const { setUser, setToken } = useAuth();
+  const { setAuthState } = useAuth();
 
   /**
    * Processes successful Google authentication response
    * 
    * @param {Object} credentialResponse - Response object from Google OAuth
+   * @param {string} credentialResponse.credential - Google-issued ID token
    * @returns {Promise<void>}
    */
-  const handleSuccess = async (credentialResponse) => {
+  const handleSuccess = useCallback(async (credentialResponse) => {
     try {
-      // API Authentication Request
-      const res = await api.post(
-        "/api/admin/google-login",
-        { token: credentialResponse.credential },
-        { timeout: 5000 }
-      );
+      // Check backend health first
+      await api.get('/api/health-check');
 
-      // Authentication Data Management
-      localStorage.setItem("token", res.data.token);
-      setToken(res.data.token);
-      setUser({
-        id: res.data.user.id,
-        email: res.data.user.email,
-        name: res.data.user.name,
-        avatar: res.data.user.avatar,
-        isGoogleAuth: true
+      // Send token to backend for validation and user info retrieval
+      const { data } = await api.post('/api/admin/google-login', {
+        token: credentialResponse.credential
+      }, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
-      // Post-authentication Actions
-      navigate("/admin");
+      // Update auth state and local storage
+      setAuthState({
+        token: data.token,
+        user: data.user,
+        isLoggedIn: true
+      });
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // Redirect to admin dashboard
+      navigate('/admin');
+
       toast({
-        title: "Login successful",
-        status: "success",
+        title: 'Login successful',
+        status: 'success',
         duration: 3000,
         isClosable: true,
+        position: 'top-right'
       });
     } catch (err) {
-      console.error("Google auth error:", err);
+      console.error('Google auth error:', err);
 
-      // Error Handling
-      let errorMessage = "Authentication failed";
-      if (err.code === "ECONNABORTED") {
-        errorMessage = "Connection timeout - check your network";
+      // Determine appropriate error message
+      let errorMessage = 'Authentication failed';
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timeout - check your connection';
       } else if (err.response?.status === 401) {
-        errorMessage = err.response?.data?.error || "Invalid Google credentials";
-      } else if (err.response?.status === 400) {
-        errorMessage = err.response?.data?.error || "Invalid request";
+        errorMessage = 'Invalid Google credentials';
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
       }
 
+      // Show error toast
       toast({
-        title: "Login failed",
+        title: 'Login failed',
         description: errorMessage,
-        status: "error",
+        status: 'error',
         duration: 5000,
         isClosable: true,
+        position: 'top-right'
       });
     }
-  };
-
-  /**
-   * Error handler for Google login failures
-   */
-  const handleError = () => {
-    console.log("Google login failed");
-    toast({
-      title: "Login failed",
-      description: "Could not authenticate with Google",
-      status: "error",
-      duration: 5000,
-      isClosable: true,
-    });
-  };
+  }, [navigate, setAuthState, toast]);
 
   return (
     <div className="google-auth-container">
       <GoogleLogin
         onSuccess={handleSuccess}
-        onError={handleError}
+        onError={() => {
+          // Handle failure in initiating Google login
+          toast({
+            title: 'Google authentication failed',
+            description: 'Please try again or use another method',
+            status: 'error',
+            duration: 5000,
+            isClosable: true
+          });
+        }}
         useOneTap
         auto_select
         shape="rectangular"
         size="large"
         text="continue_with"
+        theme="filled_blue"
+        width="300"
+        locale="en_US"
       />
-
-      <p className="cookie-warning">
+      <p className="cookie-warning text-sm mt-2 text-gray-500">
         Note: Enable third-party cookies if login fails
       </p>
     </div>
