@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Navigation from '../components/Navigation';
 import {
   Box,
   Button,
@@ -139,98 +140,101 @@ export default function SignupPage() {
   };
 
   return (
-    <Container maxW="md" py={12}>
-      <Box
-        p={8}
-        borderWidth={1}
-        borderRadius="lg"
-        boxShadow="lg"
-        bg="white"
-        _dark={{ bg: 'gray.700' }}
-      >
-        {/* Heading */}
-        <Flex justify="center" mb={8}>
-          <Heading size="xl" color="blue.500">
-            Create Account
-          </Heading>
-        </Flex>
+    <>
+      <Navigation />
+      <Container maxW="md" py={12}>
+        <Box
+          p={8}
+          borderWidth={1}
+          borderRadius="lg"
+          boxShadow="lg"
+          bg="white"
+          _dark={{ bg: 'gray.700' }}
+        >
+          {/* Heading */}
+          <Flex justify="center" mb={8}>
+            <Heading size="xl" color="blue.500">
+              Create Account
+            </Heading>
+          </Flex>
 
-        {/* Signup Form */}
-        <form onSubmit={handleSubmit}>
-          <Stack spacing={4}>
-            {/* Email field */}
-            <FormControl id="email" isRequired>
-              <FormLabel>Email address</FormLabel>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                autoComplete="email"
+          {/* Signup Form */}
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={4}>
+              {/* Email field */}
+              <FormControl id="email" isRequired>
+                <FormLabel>Email address</FormLabel>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                />
+              </FormControl>
+
+              {/* Password field (disabled if using Google) */}
+              <FormControl id="password" isRequired>
+                <FormLabel>Password</FormLabel>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a password (min 8 characters)"
+                  autoComplete="new-password"
+                />
+              </FormControl>
+
+              {/* Confirm password field (disabled if using Google) */}
+              <FormControl id="confirm-password" isRequired>
+                <FormLabel>Confirm Password</FormLabel>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  autoComplete="new-password"
+                />
+              </FormControl>
+
+              {/* Google Sign Up */}
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() =>
+                  toast({
+                    title: 'Google signup failed',
+                    description: 'Please try again later.',
+                    status: 'error',
+                    duration: 5000,
+                    isClosable: true,
+                  })
+                }
               />
-            </FormControl>
 
-            {/* Password field (disabled if using Google) */}
-            <FormControl id="password" isRequired>
-              <FormLabel>Password</FormLabel>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Create a password (min 8 characters)"
-                autoComplete="new-password"
-              />
-            </FormControl>
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                colorScheme="blue"
+                size="lg"
+                fontSize="md"
+                isLoading={isSubmitting}
+                loadingText="Creating account..."
+                isDisabled={!email || (!googleToken && (!password || !confirmPassword))}
+              >
+                {googleToken ? 'Complete Signup with Google' : 'Sign Up'}
+              </Button>
+            </Stack>
+          </form>
 
-            {/* Confirm password field (disabled if using Google) */}
-            <FormControl id="confirm-password" isRequired>
-              <FormLabel>Confirm Password</FormLabel>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
-                autoComplete="new-password"
-              />
-            </FormControl>
-
-            {/* Google Sign Up */}
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() =>
-                toast({
-                  title: 'Google signup failed',
-                  description: 'Please try again later.',
-                  status: 'error',
-                  duration: 5000,
-                  isClosable: true,
-                })
-              }
-            />
-
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              colorScheme="blue"
-              size="lg"
-              fontSize="md"
-              isLoading={isSubmitting}
-              loadingText="Creating account..."
-              isDisabled={!email || (!googleToken && (!password || !confirmPassword))}
-            >
-              {googleToken ? 'Complete Signup with Google' : 'Sign Up'}
-            </Button>
-          </Stack>
-        </form>
-
-        {/* Login link for existing users */}
-        <Text mt={4} textAlign="center">
-          Already have an account?{' '}
-          <Link as={RouterLink} to="/login" color="blue.500">
-            Log in
-          </Link>
-        </Text>
-      </Box>
-    </Container>
+          {/* Login link for existing users */}
+          <Text mt={4} textAlign="center">
+            Already have an account?{' '}
+            <Link as={RouterLink} to="/login" color="blue.500">
+              Log in
+            </Link>
+          </Text>
+        </Box>
+      </Container>
+    </>
   );
 }
