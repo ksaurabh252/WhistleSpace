@@ -1,92 +1,100 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
-/**
- * Authentication Context
- * @type {React.Context}
- */
+// Create the authentication context
 const AuthContext = createContext();
 
 /**
- * Authentication Provider Component
+ * Provides authentication context to the application
+ *
  * @param {Object} props
- * @param {React.ReactNode} props.children
+ * @param {React.ReactNode} props.children - Components that will have access to the auth context
+ * @returns {JSX.Element}
  */
 export const AuthProvider = ({ children }) => {
-  // State management
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState({
+    token: null,
+    user: null,
+    isLoggedIn: false,
+    loading: true
+  });
+
   const navigate = useNavigate();
 
-  // Token validation on mount
-  useEffect(() => {
-    const validateToken = async () => {
-      const storedToken = localStorage.getItem('token');
-      if (storedToken) {
-        try {
-          const res = await api.get('/api/admin/validate');
-          setUser(res.data.user);
-          setToken(storedToken);
-        } catch (err) {
-          localStorage.removeItem('token');
-          console.error("Token validation error:", err);
-        }
-      }
-      setLoading(false);
-    };
-    validateToken();
-  }, []);
-
   /**
-   * Handle user signup
-   * @param {string} email - User email
-   * @param {string} password - User password (optional for Google signup)
-   * @param {string} googleToken - Google OAuth token (optional)
-   * @returns {Promise<Object>} Success status and error message if any
+   * Validates token on initial load (or page refresh)
+   * Sets user session if token is valid, clears session if not
+   *
+   * @returns {Promise<void>}
    */
-  const signup = async (email, password, googleToken) => {
+  const validateToken = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user'));
+
+    if (!token) {
+      // No token, just stop loading
+      setAuthState(prev => ({ ...prev, loading: false }));
+      return;
+    }
+
     try {
-      const payload = googleToken ? { email, googleToken } : { email, password };
-      const res = await api.post('/api/admin/signup', payload, {
-        headers: { 'Content-Type': 'application/json' }
+      // Validate token with backend
+      const { data } = await api.get('/api/admin/validate', {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
-      localStorage.setItem('token', res.data.token);
-      setToken(res.data.token);
-      setUser(res.data.user);
-      navigate('/admin');
-
-      return { success: true };
+      // Set auth state with validated user
+      setAuthState({
+        token,
+        user: data.user || user,
+        isLoggedIn: true,
+        loading: false
+      });
     } catch (err) {
-      console.error('Signup error:', err);
-      return {
-        success: false,
-        error: err.response?.data?.error ||
-          err.response?.data?.message ||
-          'Signup failed. Please try again.'
-      };
+      console.error('Token validation error:', err);
+
+      // If validation fails, clear local storage and auth state
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setAuthState({
+        token: null,
+        user: null,
+        isLoggedIn: false,
+        loading: false
+      });
     }
-  };
+  }, []);
+
+  // Run token validation on mount
+  useEffect(() => {
+    validateToken();
+  }, [validateToken]);
 
   /**
-   * Handle user login
-   * @param {string} email - User email
-   * @param {string} password - User password
-   * @returns {Promise<Object>} Success status and error message if any
+   * Logs in a user with email and password
+   *
+   * @param {string} email - Admin user's email
+   * @param {string} password - Admin user's password
+   * @returns {Promise<Object>} - Success flag and error message (if any)
    */
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     try {
-      const res = await api.post('/admin/login', { email, password });
-      localStorage.setItem('token', res.data.token);
-      setUser(res.data.user);
-      setToken(res.data.token);
+      const { data } = await api.post('/api/admin/login', { email, password });
 
-      const userRes = await api.get(`/admin/users/${res.data.user.id}`);
-      setUser(userRes.data);
+      // Save token and user info in state and local storage
+      setAuthState({
+        token: data.token,
+        user: data.user,
+        isLoggedIn: true,
+        loading: false
+      });
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // Navigate to admin dashboard
       navigate('/admin');
-
       return { success: true };
     } catch (err) {
       return {
@@ -94,58 +102,114 @@ export const AuthProvider = ({ children }) => {
         error: err.response?.data?.message || 'Login failed'
       };
     }
-  };
+  }, [navigate]);
 
   /**
-   * Handle user logout
+   * Logs out the current user
+   *
+   * @returns {void}
    */
-  const logout = () => {
+  const logout = useCallback(() => {
+    // Clear session and redirect to login page
     localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
+    localStorage.removeItem('user');
+    setAuthState({
+      token: null,
+      user: null,
+      isLoggedIn: false,
+      loading: false
+    });
     navigate('/login');
-  };
+  }, [navigate]);
 
   /**
-   * Refresh authentication token
-   * @returns {Promise<string|null>} New token or null if refresh failed
+   * Handles user signup using email, password, and optional Google token.
+   *
+   * Sends a POST request to the backend to create a new admin user. On success,
+   * updates the authentication state and stores the token and user info in localStorage.
+   *
+   * @function
+   * @async
+   * @param {string} email - The user's email address.
+   * @param {string} password - The user's password.
+   * @param {string} [googleToken] - Optional Google authentication token.
+   * @returns {Promise<{success: boolean, error?: string}>} An object indicating success or failure, and an error message if failed.
    */
-  const refreshToken = async () => {
+  const signup = useCallback(async (email, password, googleToken) => {
     try {
-      const response = await api.post('/admin/refresh');
-      const newToken = response.data.token;
-      localStorage.setItem('token', newToken);
-      setToken(newToken);
-      return newToken;
-    } catch (err) {
-      logout();
-      console.error("Token refresh error:", err);
-      return null;
-    }
-  };
+      const { data } = await api.post('/api/admin/signup', {
+        email,
+        password,
+        googleToken
+      });
 
-  const isLoggedIn = !!token;
+      setAuthState({
+        token: data.token,
+        user: data.user,
+        isLoggedIn: true,
+        loading: false
+      });
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.error || 'Signup failed'
+      };
+    }
+  }, []);
+
+  /**
+   * Refreshes the current user's access token
+   *
+   * @returns {Promise<boolean>} - True if refreshed, false otherwise
+   */
+  const refreshToken = useCallback(async () => {
+    try {
+      const { data } = await api.post('/api/admin/refresh-token');
+      const newToken = data.token;
+
+      setAuthState(prev => ({
+        ...prev,
+        token: newToken
+      }));
+
+      localStorage.setItem('token', newToken);
+      return true;
+      // eslint-disable-next-line no-unused-vars
+    } catch (err) {
+      logout(); // Force logout if token refresh fails
+      return false;
+    }
+  }, [logout]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        signup,
-        token,
-        login,
-        logout,
-        refreshToken,
-        isLoggedIn,
-        loading
-      }}
-    >
+    <AuthContext.Provider value={{
+      ...authState,
+      login,
+      logout,
+      refreshToken,
+      signup,
+      setAuthState
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 /**
- * Custom hook to use authentication context
- * @returns {Object} Authentication context value
+ * Custom hook to access authentication context
+ *
+ * @returns {Object} - Authentication state and methods
+ * @throws {Error} - If used outside of AuthProvider
  */
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
