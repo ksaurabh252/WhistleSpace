@@ -12,6 +12,7 @@ const User = require("../models/User.model");
 const {
   sendNotification,
   sendWarningNotification,
+  sendWelcomeNotification,
 } = require("../utils/notifications");
 const {
   BAD_REQUEST,
@@ -120,6 +121,9 @@ async function userSignup(req, res) {
       });
     }
 
+    // Send welcome notification (ADD THIS)
+    await sendWelcomeNotification(user._id);
+
     // Check for existing user
     const encryptedEmail = encryptEmail(email.toLowerCase());
     const existingUser = await User.findOne({ encryptedEmail });
@@ -165,6 +169,95 @@ async function userSignup(req, res) {
     res.status(SERVER_ERROR).json({
       error: "Account creation failed",
       code: "SIGNUP_ERROR",
+    });
+  }
+}
+
+/**
+ * Controller: Get a paginated list of user notifications.
+ *
+ * Query Parameters:
+ *  - page (number): default Page number: 1.
+ *  - limit (number): default Number of notifications per page: 10.
+ *  - unreadOnly (boolean): If true, only return unread notifications.
+ *
+ * Requires: `req.user._id` to be available (e.g., via authentication middleware).
+ * Uses: getUserNotifications utility function from ../utils/notifications
+ *
+ * @route GET /api/notifications
+ */
+async function getUserNotifications(req, res) {
+  try {
+    const { page = 1, limit = 10, unreadOnly = false } = req.query;
+    const {
+      getUserNotifications: getNotifications,
+    } = require("../utils/notifications");
+
+    const result = await getNotifications(
+      req.user._id,
+      parseInt(page),
+      parseInt(limit),
+      unreadOnly === "true"
+    );
+
+    if (!result) {
+      return res.status(404).json({
+        error: "User not found",
+        code: "USER_NOT_FOUND",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("Get notifications error:", error);
+    res.status(500).json({
+      error: "Failed to get notifications",
+      code: "NOTIFICATIONS_ERROR",
+    });
+  }
+}
+
+/**
+ * Controller: Mark specific or all user notifications as read.
+ *
+ * Request Body:
+ *  - notificationIds (array of string): Optional. List of notification IDs to mark as read.
+ *    If empty, all notifications will be marked as read.
+ *
+ * Requires: `req.user._id` to be available (e.g., via authentication middleware).
+ * Uses: markNotificationsAsRead utility function from ../utils/notifications
+ *
+ * @route POST /api/notifications/mark-read
+ */
+async function markNotificationsRead(req, res) {
+  try {
+    const { notificationIds = [] } = req.body;
+    const { markNotificationsAsRead } = require("../utils/notifications");
+
+    const success = await markNotificationsAsRead(
+      req.user._id,
+      notificationIds
+    );
+
+    if (!success) {
+      return res.status(400).json({
+        error: "Failed to mark notifications as read",
+        code: "MARK_READ_ERROR",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Notifications marked as read",
+    });
+  } catch (error) {
+    console.error("Mark notifications read error:", error);
+    res.status(500).json({
+      error: "Failed to mark notifications as read",
+      code: "MARK_READ_ERROR",
     });
   }
 }
@@ -450,6 +543,8 @@ module.exports = {
   forgotPassword,
   resetPassword,
   getUserProfile,
+  getUserNotifications,
+  markNotificationsRead,
   encryptEmail,
   decryptEmail,
   generateUserToken,
