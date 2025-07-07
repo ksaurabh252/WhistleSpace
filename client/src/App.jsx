@@ -7,6 +7,7 @@ import SignupPage from './pages/SignupPage'
 
 import PrivateRoute from './components/PrivateRoute'
 import { AuthProvider } from './context/AuthContext'
+import UserManagement from './components/UserManagement'
 
 function App() {
   return (
@@ -21,6 +22,11 @@ function App() {
               <AdminFeedbackList />
             </PrivateRoute>
 
+          } />
+          <Route path="/admin/users" element={
+            <PrivateRoute>
+              <UserManagement />
+            </PrivateRoute>
           } />
         </Routes>
       </AuthProvider>
