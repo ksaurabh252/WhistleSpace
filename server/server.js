@@ -7,10 +7,10 @@ const path = require("path");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 
-// Load environment variables
+// Load environment variables from .env file
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
-// Initialize Express and HTTP Server
+// Initialize Express app and create HTTP server
 const app = express();
 const httpServer = createServer(app);
 
@@ -41,16 +41,17 @@ const io = new Server(httpServer, {
   },
 });
 
-// Socket connection handling
 io.on("connection", (socket) => {
   console.log("🔌 Client connected");
-  socket.on("disconnect", () => console.log("🚫 Client disconnected"));
+
+  socket.on("disconnect", () => {
+    console.log("🚫 Client disconnected");
+  });
 });
 
 // ============================================
 // Middleware Configuration
 // ============================================
-// CORS setup
 app.use(
   cors({
     origin: process.env.FRONTEND_URL,
@@ -58,21 +59,19 @@ app.use(
   })
 );
 
-// Security headers
 app.use(
   helmet({
     contentSecurityPolicy: false,
   })
 );
 
-// Request parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
+// Rate limiter middleware to prevent brute-force attacks
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 100, // limit each IP to 100 requests per window
 });
 
 app.use("/api/", limiter);
@@ -82,8 +81,6 @@ app.use("/api/", limiter);
 // ============================================
 mongoose
   .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     serverSelectionTimeoutMS: 5000,
   })
   .then(() => console.log("✅ MongoDB connected"))
@@ -95,8 +92,11 @@ mongoose
 // ============================================
 // API Routes
 // ============================================
+
+// Mount route handlers (organized and grouped)
 app.use("/api/admin", require("./routes/admin.routes"));
 app.use("/api/feedback", require("./routes/feedback.routes"));
+app.use("/api/users", require("./routes/user.routes")); // ✅ Added new route
 app.use("/api/test", require("./routes/test.routes"));
 
 // Health check endpoint
