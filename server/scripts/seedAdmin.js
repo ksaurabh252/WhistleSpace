@@ -1,75 +1,77 @@
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+const Admin = require("../models/Admin.model");
+require("dotenv").config();
+
 /**
- * Handles API errors and displays appropriate toast notifications
- * @param {Error} error - The error object from the API call
- * @param {Function} toast - Toast notification function
- * @returns {Object} Error information including message, status code, and original error
+ * Creates a default admin user in the database if none exists
+ * This script is typically run during initial system setup
+ *
+ * Environment Variables Required:
+ * - MONGO_URI: MongoDB connection string
+ * - DEFAULT_ADMIN_EMAIL: Email for default admin (optional)
+ * - DEFAULT_ADMIN_PASSWORD: Password for default admin (optional)
  */
-export const handleApiError = (error, toast) => {
-  const defaultMessage = "An unknown error occurred";
-  let message = defaultMessage;
-  let statusCode = 500;
+async function createDefaultAdmin() {
+  try {
+    // Establish database connection
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("📦 Connected to MongoDB for seeding...");
 
-  if (error.response) {
-    statusCode = error.response.status;
-    message =
-      error.response.data?.message ||
-      error.response.statusText ||
-      defaultMessage;
-
-    switch (statusCode) {
-      case 401:
-        message = "Session expired. Please login again.";
-        setTimeout(() => (window.location.href = "/login"), 2000);
-        break;
-      case 403:
-        message = "You are not authorized for this action";
-        break;
-      case 404:
-        message = "Resource not found";
-        break;
-      default:
-        if (statusCode >= 500) {
-          message = "Server error. Please try again later.";
-        }
+    // Check for existing admin to prevent duplicate creation
+    const existingAdmin = await Admin.findOne({});
+    if (existingAdmin) {
+      console.log("✅ Default admin already exists:", existingAdmin.email);
+      await mongoose.disconnect();
+      return;
     }
-  } else if (error.request) {
-    message = "Network error. Please check your connection.";
+
+    // Set up default admin credentials
+    // Falls back to hardcoded values if environment variables aren't set
+    const defaultAdminEmail =
+      process.env.DEFAULT_ADMIN_EMAIL || "admin@whistlespace.com";
+    const defaultAdminPassword =
+      process.env.DEFAULT_ADMIN_PASSWORD || "Admin123!";
+
+    // Hash password for security
+    const hashedPassword = await bcrypt.hash(defaultAdminPassword, 10);
+
+    // Create new admin document with default values
+    const defaultAdmin = await Admin.create({
+      email: defaultAdminEmail,
+      password: hashedPassword,
+      name: "Default Admin",
+      isGoogleAuth: false,
+      isDefaultAdmin: true, // Flag to identify system-created admin
+    });
+
+    // Log success information
+    console.log("✅ Default admin created successfully!");
+    console.log("📧 Email:", defaultAdminEmail);
+    console.log("🔑 Password:", defaultAdminPassword);
+    console.log("⚠️  Please change the default password after first login!");
+
+    // Clean up database connection
+    await mongoose.disconnect();
+    console.log("📦 Database connection closed.");
+  } catch (error) {
+    // Error handling
+    console.error("❌ Error creating default admin:", error);
+    await mongoose.disconnect();
+    process.exit(1); // Exit with error code
   }
-
-  toast({
-    title: "Error",
-    description: message,
-    status: "error",
-    duration: 5000,
-    isClosable: true,
-    position: "top-right",
-  });
-
-  return {
-    message,
-    statusCode,
-    originalError: error,
-  };
-};
+}
 
 /**
- * Handles successful API responses and displays success toast notifications
- * @param {Object} response - The API response object
- * @param {Function} toast - Toast notification function
- * @param {string} successMessage - Optional success message to display
- * @returns {any} Response data
+ * Script execution logic
+ * Allows file to be run directly or imported as a module
+ *
+ * Usage:
+ * - Direct execution: node createDefaultAdmin.js
+ * - Module import: const createDefaultAdmin = require('./createDefaultAdmin');
  */
-export const handleApiSuccess = (response, toast, successMessage) => {
-  if (successMessage) {
-    toast({
-      title: "Success",
-      description: successMessage,
-      status: "success",
-      duration: 3000,
-      isClosable: true,
-      position: "top-right",
-    });
-  }
+if (require.main === module) {
+  createDefaultAdmin();
+}
 
-  return response.data;
-};
+module.exports = createDefaultAdmin;
