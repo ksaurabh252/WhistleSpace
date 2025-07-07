@@ -8,6 +8,7 @@ import SignupPage from './pages/SignupPage'
 import PrivateRoute from './components/PrivateRoute'
 import { AuthProvider } from './context/AuthContext'
 import UserManagement from './components/UserManagement'
+import UserDashboard from './pages/UserDashboard'
 
 function App() {
   return (
@@ -29,6 +30,11 @@ function App() {
             </PrivateRoute>
           } />
         </Routes>
+        <Route path="/user/dashboard" element={
+          <PrivateRoute>
+            <UserDashboard />
+          </PrivateRoute>
+        } />
       </AuthProvider>
     </Router>
   )
