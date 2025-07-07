@@ -7,37 +7,48 @@ const { verifyUserToken } = require("../middleware/auth.middleware");
 const {
   handleValidationErrors,
 } = require("../middleware/validation.middleware");
+const User = require("../models/User.model");
+
+// =============================================
+// RATE LIMITING CONFIGURATION
+// =============================================
 
 /**
- * Rate limiting configuration for authentication endpoints
- * Prevents brute force attacks by limiting requests:
- * - 5 attempts per 15 minutes for general auth endpoints
- * - 3 attempts per hour for password reset endpoints
+ * Rate limiting for authentication endpoints
+ * - Prevents brute force attacks
+ * - 5 attempts per 15 minutes for general auth
  */
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per window
+  windowMs: 15 * 60 * 1000,
+  max: 5,
   message: {
     error: "Too many authentication attempts",
     code: "RATE_LIMIT_EXCEEDED",
   },
 });
 
+/**
+ * Stricter rate limiting for password reset
+ * - 3 attempts per hour
+ */
 const resetLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // Limit each IP to 3 requests per window
+  windowMs: 60 * 60 * 1000,
+  max: 3,
   message: {
     error: "Too many password reset attempts",
     code: "RESET_RATE_LIMIT",
   },
 });
 
+// =============================================
+// VALIDATION SCHEMAS
+// =============================================
+
 /**
- * Validation rules for user signup
- * Ensures:
+ * Signup validation rules:
  * - Valid email format
- * - Password meets complexity requirements
- * - Password confirmation matches
+ * - Password complexity (8+ chars, mixed case, number)
+ * - Password confirmation match
  */
 const signupValidation = [
   body("email")
@@ -50,18 +61,15 @@ const signupValidation = [
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage("Password must contain uppercase, lowercase, and number"),
   body("confirmPassword").custom((value, { req }) => {
-    if (value !== req.body.password) {
-      throw new Error("Passwords do not match");
-    }
+    if (value !== req.body.password) throw new Error("Passwords do not match");
     return true;
   }),
 ];
 
 /**
- * Validation rules for user login
- * Ensures:
+ * Login validation rules:
  * - Valid email format
- * - Password field is not empty
+ * - Non-empty password
  */
 const loginValidation = [
   body("email")
@@ -71,25 +79,73 @@ const loginValidation = [
   body("password").notEmpty().withMessage("Password is required"),
 ];
 
+// =============================================
+// NOTIFICATION ROUTES
+// =============================================
+
 /**
- * POST /signup - User registration endpoint
- * Protected by:
- * - Rate limiting
- * - Input validation
+ * GET /notifications
+ * - Returns all user notifications
+ * - Protected by JWT
  */
-router.post(
-  "/signup",
-  authLimiter, // Apply rate limiting
-  signupValidation, // Validate request body
-  handleValidationErrors, // Handle validation errors
-  userController.userSignup // Controller function
+router.get(
+  "/notifications",
+  verifyUserToken,
+  userController.getUserNotifications
 );
 
 /**
- * POST /login - User authentication endpoint
- * Protected by:
- * - Rate limiting
- * - Input validation
+ * POST /notifications/mark-read
+ * - Marks notifications as read
+ * - Accepts array of notification IDs
+ * - Protected by JWT
+ */
+router.post(
+  "/notifications/mark-read",
+  verifyUserToken,
+  [body("notificationIds").optional().isArray()],
+  handleValidationErrors,
+  userController.markNotificationsRead
+);
+
+/**
+ * GET /notifications/unread-count
+ * - Returns count of unread notifications
+ * - Protected by JWT
+ */
+router.get("/notifications/unread-count", verifyUserToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    const unreadCount = user.notifications.filter((n) => !n.read).length;
+    res.json({ success: true, unreadCount });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to get unread count" });
+  }
+});
+
+// =============================================
+// AUTHENTICATION ROUTES
+// =============================================
+
+/**
+ * POST /signup
+ * - User registration endpoint
+ * - Rate limited (5/15min)
+ * - Validates email and password requirements
+ */
+router.post(
+  "/signup",
+  authLimiter,
+  signupValidation,
+  handleValidationErrors,
+  userController.userSignup
+);
+
+/**
+ * POST /login
+ * - User authentication endpoint
+ * - Rate limited (5/15min)
+ * - Validates email format and password presence
  */
 router.post(
   "/login",
@@ -100,10 +156,10 @@ router.post(
 );
 
 /**
- * POST /forgot-password - Password reset request endpoint
- * Protected by:
- * - Stricter rate limiting
- * - Email validation
+ * POST /forgot-password
+ * - Password reset request
+ * - Stricter rate limit (3/hour)
+ * - Validates email format
  */
 router.post(
   "/forgot-password",
@@ -114,11 +170,10 @@ router.post(
 );
 
 /**
- * POST /reset-password/:token - Password reset completion endpoint
- * Protected by:
- * - Stricter rate limiting
- * - Password complexity validation
- * - Password confirmation match
+ * POST /reset-password/:token
+ * - Password reset completion
+ * - Stricter rate limit (3/hour)
+ * - Validates password complexity and match
  */
 router.post(
   "/reset-password/:token",
@@ -126,9 +181,8 @@ router.post(
   [
     body("password").isLength({ min: 8 }),
     body("confirmPassword").custom((value, { req }) => {
-      if (value !== req.body.password) {
+      if (value !== req.body.password)
         throw new Error("Passwords do not match");
-      }
       return true;
     }),
   ],
@@ -137,14 +191,10 @@ router.post(
 );
 
 /**
- * GET /profile - User profile retrieval endpoint
- * Protected by:
- * - JWT authentication middleware
+ * GET /profile
+ * - Returns user profile data
+ * - Protected by JWT
  */
-router.get(
-  "/profile",
-  verifyUserToken, // Requires valid JWT token
-  userController.getUserProfile
-);
+router.get("/profile", verifyUserToken, userController.getUserProfile);
 
 module.exports = router;
