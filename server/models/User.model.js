@@ -104,14 +104,6 @@ const UserSchema = new mongoose.Schema({
 });
 
 /**
- * Database Indexing
- * Optimizes common query operations
- */
-UserSchema.index({ systemId: 1 });
-UserSchema.index({ encryptedEmail: 1 });
-UserSchema.index({ banUntil: 1 });
-
-/**
  * Virtual Properties
  * Computed properties that don't persist in the database
  */
