@@ -1,9 +1,3 @@
-/**
- * User Authentication Controller
- * Handles user registration, authentication, and profile management
- * Includes email encryption and security measures
- */
-
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
