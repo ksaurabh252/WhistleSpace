@@ -23,7 +23,7 @@ import {
   IconButton,
   useColorModeValue
 } from '@chakra-ui/react';
-import { FaBell, FaCheck, FaTrash, FaRefresh } from 'react-icons/fa';
+import { FaBell, FaCheck, FaTrash, FaSync } from 'react-icons/fa';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 
@@ -284,7 +284,7 @@ const UserDashboard = () => {
           {/* Action buttons */}
           <HStack>
             <Button
-              leftIcon={<FaRefresh />}
+              leftIcon={<FaSync />}
               onClick={() => fetchNotifications()}
               variant="outline"
               size="sm"
