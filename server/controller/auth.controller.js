@@ -1,8 +1,17 @@
 const { OAuth2Client } = require("google-auth-library");
-
 const jwt = require("jsonwebtoken");
 const Admin = require("../models/Admin.model");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+/**
+ * Logs in an admin using Google OAuth token.
+ *
+ * @async
+ * @function googleLogin
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Responds with JWT and user info or error message.
+ */
 async function googleLogin(req, res) {
   try {
     const { token: googleToken } = req.body;
@@ -11,6 +20,7 @@ async function googleLogin(req, res) {
       return res.status(400).json({ error: "Google token is required" });
     }
 
+    // Verify the ID token and extract payload
     const ticket = await client.verifyIdToken({
       idToken: googleToken,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -30,6 +40,7 @@ async function googleLogin(req, res) {
       });
     }
 
+    // Sign and return a JWT token
     const jwtToken = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });
@@ -52,18 +63,30 @@ async function googleLogin(req, res) {
     });
   }
 }
+
+/**
+ * Registers a new user using email/password or Google OAuth.
+ *
+ * @async
+ * @function signup
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>} Responds with JWT and user info or error message.
+ *
+ * @note `User` and `bcrypt` must be imported for this function to work.
+ * This function is not currently exported.
+ */
 async function signup(req, res) {
   try {
     const { email, password, googleToken } = req.body;
 
-    // Check if user exists
     let user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({ error: "Email already exists" });
     }
 
-    // If signing up with Google, verify token
     let googleData = null;
+
     if (googleToken) {
       const ticket = await client.verifyIdToken({
         idToken: googleToken,
@@ -72,7 +95,6 @@ async function signup(req, res) {
       googleData = ticket.getPayload();
     }
 
-    // Create user (with or without Google)
     user = await User.create({
       email,
       password: password ? await bcrypt.hash(password, 10) : undefined,
@@ -81,7 +103,6 @@ async function signup(req, res) {
       isGoogleAuth: !!googleToken,
     });
 
-    // Generate JWT
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });
