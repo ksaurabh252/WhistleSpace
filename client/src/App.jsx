@@ -29,12 +29,12 @@ function App() {
               <UserManagement />
             </PrivateRoute>
           } />
+          <Route path="/user/dashboard" element={
+            <PrivateRoute>
+              <UserDashboard />
+            </PrivateRoute>
+          } />
         </Routes>
-        <Route path="/user/dashboard" element={
-          <PrivateRoute>
-            <UserDashboard />
-          </PrivateRoute>
-        } />
       </AuthProvider>
     </Router>
   )
