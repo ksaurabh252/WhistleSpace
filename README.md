@@ -1,4 +1,5 @@
-```markdown
+markdown
+
 # 🚀 WhistleSpace
 
 **WhistleSpace** is a modern, secure, and anonymous feedback platform for schools, startups, and organizations. It empowers users to submit feedback and concerns without revealing their identity, while providing admins with a powerful dashboard for moderation and response.
@@ -6,14 +7,11 @@
 ---
 
 ## 🏗️ Project Structure
-```
 
-whistlespace/
-├── backend/ # Node.js, Express, MongoDB API
-├── frontend/ # React, Chakra UI client
-└── README.md # (this file)
-
-````
+- whistlespace/
+  - backend/ (Node.js, Express, MongoDB API)
+  - frontend/ (React, Chakra UI client)
+  - README.md (this file)
 
 ---
 
@@ -44,7 +42,7 @@ whistlespace/
 ```bash
 git clone https://github.com/yourusername/whistlespace.git
 cd whistlespace
-````
+```
 
 ---
 
@@ -153,7 +151,3 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 ---
 
 **Made with ❤️ for open feedback and better communication.**
-
-```
-
-```
