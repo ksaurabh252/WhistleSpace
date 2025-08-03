@@ -41,6 +41,7 @@ const AdminDashboard = () => {
   const toast = useToast();
   const { logout } = useAdminAuth();
   const abortControllerRef = useRef(null);
+  const commentBg = useColorModeValue("gray.50", "gray.700");
 
   // Color mode values
   const cardBg = useColorModeValue("white", "gray.800");
@@ -389,13 +390,15 @@ const AdminDashboard = () => {
                   {selected?.comments?.length === 0 && (
                     <Text color="gray.500">No comments.</Text>
                   )}
+
+
                   {selected.comments.map((c) => (
                     <Box
                       key={c._id}
                       p={3}
                       borderWidth={1}
                       borderRadius="md"
-                      bg={useColorModeValue("gray.50", "gray.700")}
+                      bg={commentBg}
                     >
                       <Text>{c.text}</Text>
                       <HStack justify="space-between" mt={2}>
