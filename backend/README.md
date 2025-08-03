@@ -1,6 +1,3 @@
----
-
-```markdown
 # 🚀 WhistleSpace Backend
 
 WhistleSpace is a modern, secure, and anonymous feedback platform for schools, startups, and organizations. This is the **backend** built with Node.js, Express, and MongoDB, providing robust APIs, admin authentication, email notifications, and optional AI moderation.
@@ -144,8 +141,3 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 ---
 
 **Made with ❤️ for open feedback and better communication.**
-
-```
-
----
-```
