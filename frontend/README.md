@@ -1,6 +1,3 @@
----
-
-```markdown
 # 🚀 WhistleSpace Frontend
 
 WhistleSpace is a modern, anonymous feedback platform for schools, startups, and organizations. This is the **frontend** built with React and Chakra UI, providing a clean, responsive, and user-friendly interface for both users and admins.
@@ -115,8 +112,3 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 ---
 
 **Made with ❤️ for open feedback and better communication.**
-
-```
-
----
-```
