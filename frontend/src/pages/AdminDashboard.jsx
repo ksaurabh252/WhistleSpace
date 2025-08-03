@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import { useEffect, useRef, useState } from "react";
 import {
   Box,
@@ -14,7 +13,10 @@ import {
   Spinner,
   Alert,
   AlertIcon,
+  useColorModeValue,
+  IconButton,
 } from "@chakra-ui/react";
+import { InfoOutlineIcon, DeleteIcon, SunIcon, MoonIcon } from "@chakra-ui/icons";
 import {
   getAllFeedbacks,
   updateFeedbackStatus,
@@ -39,29 +41,28 @@ const AdminDashboard = () => {
   const toast = useToast();
   const { logout } = useAdminAuth();
   const abortControllerRef = useRef(null);
-  // const isMountedRef = useRef(true);
+
+  // Color mode values
+  const cardBg = useColorModeValue("white", "gray.800");
+  const cardSelectedBg = useColorModeValue("blue.50", "blue.900");
+  const cardBorder = useColorModeValue("blue.200", "blue.400");
+  const mainBg = useColorModeValue("gray.50", "gray.900");
 
   const fetchFeedbacks = async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-
     abortControllerRef.current = new AbortController();
     setLoading(true);
     setError("");
-
     try {
       const params = {};
       if (filterTag) params.tags = filterTag;
       if (filterStatus) params.status = filterStatus;
-
       const res = await getAllFeedbacks(params, {
         signal: abortControllerRef.current.signal,
       });
-
-      // if (isMountedRef.current) {
       setFeedbacks(res.data);
-      // }
     } catch (err) {
       if (err.name !== "AbortError" && err.message !== "canceled") {
         const errorMessage = getErrorMessage(err);
@@ -69,17 +70,13 @@ const AdminDashboard = () => {
         handleApiError(err, toast, "Failed to load feedback");
       }
     } finally {
-      // if (isMountedRef.current) {
       setLoading(false);
-      // }
     }
   };
 
   useEffect(() => {
     fetchFeedbacks();
-
     return () => {
-      // isMountedRef.current = false;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -89,8 +86,6 @@ const AdminDashboard = () => {
   const handleStatusChange = async (id, status) => {
     try {
       await updateFeedbackStatus(id, status);
-
-      // if (isMountedRef.current) {
       toast({
         title: "Success",
         description: "Status updated successfully",
@@ -98,17 +93,12 @@ const AdminDashboard = () => {
         duration: 3000,
         isClosable: true,
       });
-
       fetchFeedbacks();
-
       if (selected && selected._id === id) {
         fetchDetails(id);
       }
-      // }
     } catch (err) {
-      // if (isMountedRef.current) {
       handleApiError(err, toast, "Failed to update status");
-      // }
     }
   };
 
@@ -116,8 +106,6 @@ const AdminDashboard = () => {
     if (!window.confirm("Delete this feedback?")) return;
     try {
       await deleteFeedback(id);
-
-      // if (isMountedRef.current) {
       toast({
         title: "Success",
         description: "Feedback deleted successfully",
@@ -125,19 +113,15 @@ const AdminDashboard = () => {
         duration: 3000,
         isClosable: true,
       });
-
       setSelected(null);
       fetchFeedbacks();
     } catch (err) {
-      // if (isMountedRef.current) {
       handleApiError(err, toast, "Failed to delete feedback");
-      // }
     }
   };
 
   const fetchDetails = async (id) => {
     setDetailsLoading(true);
-
     try {
       const res = await getFeedbackById(id);
       setSelected({ ...res.data.feedback, comments: res.data.comments });
@@ -149,7 +133,6 @@ const AdminDashboard = () => {
 
   const handleDeleteComment = async (feedbackId, commentId) => {
     if (!window.confirm("Delete this comment?")) return;
-
     try {
       await deleteComment(feedbackId, commentId);
       toast({ title: "Comment deleted", status: "success" });
@@ -159,23 +142,34 @@ const AdminDashboard = () => {
     }
   };
 
-  if (loading) return <Spinner />;
+  if (loading) return <Spinner size="xl" mt={20} />;
 
   return (
-    <Box maxW="1200px" mx="auto" p={4}>
-      <HStack justify="space-between" mb={4}>
-        <Heading>Admin Dashboard</Heading>
-        <Button colorScheme="red" onClick={logout}>
+    <Box
+      maxW="1200px"
+      mx="auto"
+      p={{ base: 2, md: 6 }}
+      minH="100vh"
+      bg={mainBg}
+      borderRadius="2xl"
+      boxShadow="lg"
+    >
+      <HStack justify="space-between" mb={6}>
+        <Heading size="lg" letterSpacing="tight">
+          Admin Dashboard
+        </Heading>
+        <Button colorScheme="red" onClick={logout} size="md" fontWeight="bold">
           Logout
         </Button>
       </HStack>
 
-      <HStack mb={4}>
+      <HStack mb={6} spacing={4}>
         <Select
           placeholder="Filter by tag"
           value={filterTag}
           onChange={(e) => setFilterTag(e.target.value)}
           maxW="200px"
+          bg={cardBg}
         >
           {TAG_OPTIONS.map((tag) => (
             <option key={tag} value={tag}>
@@ -183,30 +177,31 @@ const AdminDashboard = () => {
             </option>
           ))}
         </Select>
-
         <Select
           placeholder="Filter by status"
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
           maxW="200px"
+          bg={cardBg}
         >
           <option value="open">Open</option>
           <option value="resolved">Resolved</option>
           <option value="closed">Closed</option>
         </Select>
-
         <Button
           onClick={() => {
             setFilterTag("");
             setFilterStatus("");
           }}
+          colorScheme="blue"
+          variant="outline"
         >
           Clear Filters
         </Button>
       </HStack>
 
       {error && (
-        <Alert status="error" mb={4}>
+        <Alert status="error" mb={4} borderRadius="md">
           <AlertIcon />
           {error}
         </Alert>
@@ -214,26 +209,46 @@ const AdminDashboard = () => {
 
       <Stack
         direction={{ base: "column", md: "row" }}
-        spacing={6}
+        spacing={8}
         align="flex-start"
       >
+        {/* Feedback List */}
         <Box flex="1" minW="350px">
-          <Heading size="sm" mb={2}>
+          <Heading size="md" mb={4} color="blue.400" letterSpacing="tight">
             Feedback List
           </Heading>
-          <Stack spacing={3}>
+          <Stack spacing={5}>
             {feedbacks.map((fb) => (
               <Box
                 key={fb._id}
-                p={3}
-                borderWidth={1}
-                borderRadius="md"
-                bg={selected && selected._id === fb._id ? "gray.100" : "white"}
+                p={5}
+                borderWidth={2}
+                borderColor={selected?._id === fb._id ? cardBorder : "transparent"}
+                borderRadius="xl"
+                bg={selected?._id === fb._id ? cardSelectedBg : cardBg}
+                boxShadow="md"
+                _hover={{
+                  boxShadow: "xl",
+                  transform: "scale(1.02)",
+                  borderColor: cardBorder,
+                }}
+                transition="all 0.2s"
+                cursor="pointer"
+                onClick={() => fetchDetails(fb._id)}
               >
-                <HStack justify="space-between">
+                <HStack justify="space-between" mb={2}>
                   <HStack>
                     {fb.tags.map((tag) => (
-                      <Tag key={tag} colorScheme="blue">
+                      <Tag
+                        key={tag}
+                        colorScheme="purple"
+                        variant="solid"
+                        fontWeight="bold"
+                        borderRadius="full"
+                        px={3}
+                        py={1}
+                        fontSize="sm"
+                      >
                         {tag}
                       </Tag>
                     ))}
@@ -246,35 +261,46 @@ const AdminDashboard = () => {
                           ? "gray"
                           : "orange"
                     }
+                    fontSize="0.9em"
+                    px={3}
+                    py={1}
+                    borderRadius="md"
                   >
-                    {fb.status}
+                    {fb.status.toUpperCase()}
                   </Badge>
                 </HStack>
-                <Text mt={2} mb={2} noOfLines={2}>
-                  {fb.text}
+                <Text mt={2} mb={2} noOfLines={2} fontSize="md" fontWeight="medium">
+                  {fb.text || <i>No feedback text</i>}
                 </Text>
-                <HStack justify="space-between">
-                  <Text fontSize="sm" color="gray.500">
+                <HStack justify="space-between" mt={3}>
+                  <Text fontSize="sm" color="gray.400">
                     {new Date(fb.createdAt).toLocaleString()}
                   </Text>
                   <HStack>
                     <Button
-                      size="xs"
-                      colorScheme="teal"
-                      variant="outline"
-                      onClick={() => fetchDetails(fb._id)}
+                      size="sm"
+                      colorScheme="blue"
+                      leftIcon={<InfoOutlineIcon />}
+                      variant="solid"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fetchDetails(fb._id);
+                      }}
                     >
                       Details
                     </Button>
-                    {/* <Button size="xs" colorScheme="red" variant="outline" onClick={() => handleDeleteFeedback(fb._id)}>
-                      Delete
-                    </Button> */}
                     <ConfirmModal
                       onConfirm={() => handleDeleteFeedback(fb._id)}
                       title="Delete Feedback"
                       body="Are you sure you want to delete this feedback? This action cannot be undone."
                     >
-                      <Button size="xs" colorScheme="red" variant="outline">
+                      <Button
+                        size="sm"
+                        colorScheme="red"
+                        leftIcon={<DeleteIcon />}
+                        variant="outline"
+                        onClick={e => e.stopPropagation()}
+                      >
                         Delete
                       </Button>
                     </ConfirmModal>
@@ -285,16 +311,33 @@ const AdminDashboard = () => {
           </Stack>
         </Box>
 
+        {/* Feedback Details */}
         <Box flex="2" minW="350px">
           {detailsLoading && <Spinner />}
           {selected && !detailsLoading && (
-            <Box p={4} borderWidth={1} borderRadius="md">
-              <Heading size="sm" mb={2}>
+            <Box
+              p={6}
+              borderWidth={2}
+              borderRadius="xl"
+              bg={cardBg}
+              boxShadow="lg"
+              borderColor={cardBorder}
+            >
+              <Heading size="md" mb={3} color="blue.400">
                 Feedback Details
               </Heading>
               <HStack mb={2}>
                 {selected?.tags?.map((tag) => (
-                  <Tag key={tag} colorScheme="blue">
+                  <Tag
+                    key={tag}
+                    colorScheme="purple"
+                    variant="solid"
+                    fontWeight="bold"
+                    borderRadius="full"
+                    px={3}
+                    py={1}
+                    fontSize="sm"
+                  >
                     {tag}
                   </Tag>
                 ))}
@@ -306,20 +349,26 @@ const AdminDashboard = () => {
                         ? "gray"
                         : "orange"
                   }
+                  fontSize="0.9em"
+                  px={3}
+                  py={1}
+                  borderRadius="md"
                 >
-                  {selected.status}
+                  {selected.status.toUpperCase()}
                 </Badge>
               </HStack>
-
-              <Text mb={2}>{selected.text}</Text>
-              <Text fontSize="sm" color="gray.500">
+              <Text mb={2} fontSize="lg" fontWeight="semibold">
+                {selected.text}
+              </Text>
+              <Text fontSize="sm" color="gray.400">
                 {new Date(selected.createdAt).toLocaleString()}
               </Text>
-              <HStack mt={3} spacing={2}>
+              <HStack mt={4} spacing={3}>
                 <Button
                   size="sm"
                   colorScheme="green"
                   onClick={() => handleStatusChange(selected._id, "resolved")}
+                  variant="solid"
                 >
                   Mark as Resolved
                 </Button>
@@ -327,28 +376,32 @@ const AdminDashboard = () => {
                   size="sm"
                   colorScheme="gray"
                   onClick={() => handleStatusChange(selected._id, "closed")}
+                  variant="outline"
                 >
                   Mark as Closed
                 </Button>
               </HStack>
-              <Box mt={6}>
-                <Heading size="xs" mb={2}>
+              <Box mt={8}>
+                <Heading size="sm" mb={3} color="blue.400">
                   Comments
                 </Heading>
-                <Stack spacing={2}>
+                <Stack spacing={3}>
                   {selected?.comments?.length === 0 && (
                     <Text color="gray.500">No comments.</Text>
                   )}
                   {selected.comments.map((c) => (
-                    <Box key={c._id} p={2} borderWidth={1} borderRadius="md">
+                    <Box
+                      key={c._id}
+                      p={3}
+                      borderWidth={1}
+                      borderRadius="md"
+                      bg={useColorModeValue("gray.50", "gray.700")}
+                    >
                       <Text>{c.text}</Text>
-                      <HStack justify="space-between">
-                        <Text fontSize="xs" color="gray.500">
+                      <HStack justify="space-between" mt={2}>
+                        <Text fontSize="xs" color="gray.400">
                           {new Date(c.createdAt).toLocaleString()}
                         </Text>
-                        {/* <Button size="xs" colorScheme="red" variant="outline" onClick={() => handleDeleteComment(selected._id, c._id)}>
-                          Delete
-                        </Button> */}
                         <ConfirmModal
                           onConfirm={() =>
                             handleDeleteComment(selected._id, c._id)
@@ -356,9 +409,13 @@ const AdminDashboard = () => {
                           title="Delete Comment"
                           body="Are you sure you want to delete this comment? This action cannot be undone."
                         >
-                          <Button size="xs" colorScheme="red" variant="outline">
-                            Delete
-                          </Button>
+                          <IconButton
+                            size="xs"
+                            colorScheme="red"
+                            icon={<DeleteIcon />}
+                            variant="ghost"
+                            aria-label="Delete comment"
+                          />
                         </ConfirmModal>
                       </HStack>
                     </Box>
