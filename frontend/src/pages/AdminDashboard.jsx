@@ -10,13 +10,15 @@ import {
   Select,
   Text,
   useToast,
-  Spinner,
   Alert,
   AlertIcon,
   useColorModeValue,
   IconButton,
+  Skeleton,
+  SkeletonText,
 } from "@chakra-ui/react";
-import { InfoOutlineIcon, DeleteIcon, SunIcon, MoonIcon } from "@chakra-ui/icons";
+import { InfoOutlineIcon, DeleteIcon } from "@chakra-ui/icons";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   getAllFeedbacks,
   updateFeedbackStatus,
@@ -28,7 +30,52 @@ import { useAdminAuth } from "../context/AdminAuthContext";
 import ConfirmModal from "../components/ConfirmModal";
 import { getErrorMessage, handleApiError } from "../utils/errorHandler";
 
+const MotionBox = motion(Box);
 const TAG_OPTIONS = ["bug", "feature", "ui", "performance", "other"];
+const STATUS_COLORS = { resolved: "green", closed: "gray", open: "orange" };
+
+const SkeletonCard = ({ bg, border, commentBg, detailed }) => (
+  <Box
+    p={detailed ? 6 : 5}
+    borderWidth={2}
+    borderRadius="xl"
+    bg={bg}
+    boxShadow={detailed ? "lg" : "md"}
+    borderColor={detailed ? border : undefined}
+  >
+    <HStack mb={2}>
+      {[...Array(detailed ? 2 : 4)].map((_, i) => (
+        <Skeleton key={i} height="24px" width="60px" borderRadius="full" />
+      ))}
+    </HStack>
+    <SkeletonText mt="4" noOfLines={detailed ? 3 : 2} spacing="4" />
+    <Skeleton height="20px" width="120px" mt={2} />
+    {detailed && (
+      <>
+        <HStack mt={4} spacing={3}>
+          <Skeleton height="32px" width="140px" borderRadius="md" />
+          <Skeleton height="32px" width="140px" borderRadius="md" />
+        </HStack>
+        <Box mt={8}>
+          <Skeleton height="24px" width="120px" mb={3} />
+          <Stack spacing={3}>
+            {[...Array(2)].map((_, i) => (
+              <Box
+                key={i}
+                p={3}
+                borderWidth={1}
+                borderRadius="md"
+                bg={commentBg}
+              >
+                <SkeletonText noOfLines={2} spacing="2" />
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      </>
+    )}
+  </Box>
+);
 
 const AdminDashboard = () => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -41,18 +88,20 @@ const AdminDashboard = () => {
   const toast = useToast();
   const { logout } = useAdminAuth();
   const abortControllerRef = useRef(null);
+
+  const cardBg = useColorModeValue("white", "gray.800");
+  const cardSelectedBg = useColorModeValue("teal.50", "blue.900");
+  const cardBorder = useColorModeValue("teal.200", "blue.400");
+  const mainBg = useColorModeValue("gray.50", "gray.900");
+  const textColor = useColorModeValue("gray.700", "gray.200");
+  const subTextColor = useColorModeValue("gray.500", "gray.400");
   const commentBg = useColorModeValue("gray.50", "gray.700");
 
-  // Color mode values
-  const cardBg = useColorModeValue("white", "gray.800");
-  const cardSelectedBg = useColorModeValue("blue.50", "blue.900");
-  const cardBorder = useColorModeValue("blue.200", "blue.400");
-  const mainBg = useColorModeValue("gray.50", "gray.900");
+  const showToast = (title, status = "success") =>
+    toast({ title, status, duration: 3000, isClosable: true });
 
   const fetchFeedbacks = async () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
     setLoading(true);
     setError("");
@@ -66,8 +115,7 @@ const AdminDashboard = () => {
       setFeedbacks(res.data);
     } catch (err) {
       if (err.name !== "AbortError" && err.message !== "canceled") {
-        const errorMessage = getErrorMessage(err);
-        setError(errorMessage);
+        setError(getErrorMessage(err));
         handleApiError(err, toast, "Failed to load feedback");
       }
     } finally {
@@ -77,43 +125,24 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchFeedbacks();
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
+    return () => abortControllerRef.current?.abort();
   }, [filterTag, filterStatus]);
 
   const handleStatusChange = async (id, status) => {
     try {
       await updateFeedbackStatus(id, status);
-      toast({
-        title: "Success",
-        description: "Status updated successfully",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
+      showToast("Status updated");
       fetchFeedbacks();
-      if (selected && selected._id === id) {
-        fetchDetails(id);
-      }
+      if (selected?._id === id) fetchDetails(id);
     } catch (err) {
       handleApiError(err, toast, "Failed to update status");
     }
   };
 
   const handleDeleteFeedback = async (id) => {
-    if (!window.confirm("Delete this feedback?")) return;
     try {
       await deleteFeedback(id);
-      toast({
-        title: "Success",
-        description: "Feedback deleted successfully",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
+      showToast("Feedback deleted");
       setSelected(null);
       fetchFeedbacks();
     } catch (err) {
@@ -127,23 +156,109 @@ const AdminDashboard = () => {
       const res = await getFeedbackById(id);
       setSelected({ ...res.data.feedback, comments: res.data.comments });
     } catch {
-      toast({ title: "Failed to load details", status: "error" });
+      showToast("Failed to load details", "error");
     }
     setDetailsLoading(false);
   };
 
   const handleDeleteComment = async (feedbackId, commentId) => {
-    if (!window.confirm("Delete this comment?")) return;
     try {
       await deleteComment(feedbackId, commentId);
-      toast({ title: "Comment deleted", status: "success" });
+      showToast("Comment deleted");
       fetchDetails(feedbackId);
     } catch {
-      toast({ title: "Failed to delete comment", status: "error" });
+      showToast("Failed to delete comment", "error");
     }
   };
 
-  if (loading) return <Spinner size="xl" mt={20} />;
+  const FeedbackCard = ({ fb }) => (
+    <Box
+      p={5}
+      borderWidth={2}
+      borderRadius="xl"
+      bg={selected?._id === fb._id ? cardSelectedBg : cardBg}
+      borderColor={selected?._id === fb._id ? cardBorder : "transparent"}
+      boxShadow="md"
+      cursor="pointer"
+      onClick={() => fetchDetails(fb._id)}
+      _hover={{
+        boxShadow: "xl",
+        transform: "scale(1.02)",
+        borderColor: cardBorder,
+      }}
+      transition="all 0.2s"
+    >
+      <HStack justify="space-between" mb={2}>
+        <HStack>
+          {fb.tags.map((tag) => (
+            <Tag
+              key={tag}
+              colorScheme="purple"
+              variant="solid"
+              borderRadius="full"
+              px={3}
+              py={1}
+              fontSize="sm"
+            >
+              {tag}
+            </Tag>
+          ))}
+        </HStack>
+        <Badge
+          colorScheme={STATUS_COLORS[fb.status]}
+          fontSize="0.9em"
+          px={3}
+          py={1}
+          borderRadius="md"
+        >
+          {fb.status.toUpperCase()}
+        </Badge>
+      </HStack>
+      <Text
+        mt={2}
+        mb={2}
+        noOfLines={2}
+        fontSize="md"
+        fontWeight="medium"
+        color={textColor}
+      >
+        {fb.text || <i>No feedback text</i>}
+      </Text>
+      <HStack justify="space-between" mt={3}>
+        <Text fontSize="sm" color={subTextColor}>
+          {new Date(fb.createdAt).toLocaleString()}
+        </Text>
+        <HStack>
+          <Button
+            size="sm"
+            colorScheme="teal"
+            leftIcon={<InfoOutlineIcon />}
+            onClick={(e) => {
+              e.stopPropagation();
+              fetchDetails(fb._id);
+            }}
+          >
+            Details
+          </Button>
+          <ConfirmModal
+            onConfirm={() => handleDeleteFeedback(fb._id)}
+            title="Delete Feedback"
+            body="Are you sure? This action cannot be undone."
+          >
+            <Button
+              size="sm"
+              colorScheme="red"
+              leftIcon={<DeleteIcon />}
+              variant="outline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Delete
+            </Button>
+          </ConfirmModal>
+        </HStack>
+      </HStack>
+    </Box>
+  );
 
   return (
     <Box
@@ -156,7 +271,7 @@ const AdminDashboard = () => {
       boxShadow="lg"
     >
       <HStack justify="space-between" mb={6}>
-        <Heading size="lg" letterSpacing="tight">
+        <Heading size="lg" color="teal.500">
           Admin Dashboard
         </Heading>
         <Button colorScheme="red" onClick={logout} size="md" fontWeight="bold">
@@ -185,16 +300,18 @@ const AdminDashboard = () => {
           maxW="200px"
           bg={cardBg}
         >
-          <option value="open">Open</option>
-          <option value="resolved">Resolved</option>
-          <option value="closed">Closed</option>
+          {["open", "resolved", "closed"].map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
         </Select>
         <Button
           onClick={() => {
             setFilterTag("");
             setFilterStatus("");
           }}
-          colorScheme="blue"
+          colorScheme="teal"
           variant="outline"
         >
           Clear Filters
@@ -213,38 +330,65 @@ const AdminDashboard = () => {
         spacing={8}
         align="flex-start"
       >
-        {/* Feedback List */}
         <Box flex="1" minW="350px">
-          <Heading size="md" mb={4} color="blue.400" letterSpacing="tight">
+          <Heading size="md" mb={4} color="teal.400">
             Feedback List
           </Heading>
-          <Stack spacing={5}>
-            {feedbacks.map((fb) => (
-              <Box
-                key={fb._id}
-                p={5}
-                borderWidth={2}
-                borderColor={selected?._id === fb._id ? cardBorder : "transparent"}
-                borderRadius="xl"
-                bg={selected?._id === fb._id ? cardSelectedBg : cardBg}
-                boxShadow="md"
-                _hover={{
-                  boxShadow: "xl",
-                  transform: "scale(1.02)",
-                  borderColor: cardBorder,
-                }}
-                transition="all 0.2s"
-                cursor="pointer"
-                onClick={() => fetchDetails(fb._id)}
-              >
-                <HStack justify="space-between" mb={2}>
-                  <HStack>
-                    {fb.tags.map((tag) => (
+          {loading ? (
+            <Stack spacing={5}>
+              {[...Array(3)].map((_, i) => (
+                <SkeletonCard
+                  key={i}
+                  bg={cardBg}
+                  border={cardBorder}
+                  commentBg={commentBg}
+                />
+              ))}
+            </Stack>
+          ) : (
+            <Stack spacing={5}>
+              {feedbacks.map((fb) => (
+                <FeedbackCard key={fb._id} fb={fb} />
+              ))}
+            </Stack>
+          )}
+        </Box>
+
+        <Box flex="2" minW="350px">
+          <AnimatePresence mode="wait">
+            {loading || detailsLoading ? (
+              <SkeletonCard
+                key="skeleton"
+                bg={cardBg}
+                border={cardBorder}
+                commentBg={commentBg}
+                detailed
+              />
+            ) : (
+              selected && (
+                <MotionBox
+                  key={selected._id}
+                  p={6}
+                  borderWidth={2}
+                  borderRadius="xl"
+                  bg={cardBg}
+                  boxShadow="lg"
+                  borderColor={cardBorder}
+                  mt={2}
+                  initial={{ opacity: 0, scale: 0.95, y: 30 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 30 }}
+                  transition={{ duration: 0.35, type: "spring" }}
+                >
+                  <Heading size="md" mb={3} color="blue.400">
+                    Feedback Details
+                  </Heading>
+                  <HStack mb={2}>
+                    {selected?.tags?.map((tag) => (
                       <Tag
                         key={tag}
                         colorScheme="purple"
                         variant="solid"
-                        fontWeight="bold"
                         borderRadius="full"
                         px={3}
                         py={1}
@@ -253,180 +397,93 @@ const AdminDashboard = () => {
                         {tag}
                       </Tag>
                     ))}
+                    <Badge
+                      colorScheme={STATUS_COLORS[selected.status]}
+                      fontSize="0.9em"
+                      px={3}
+                      py={1}
+                      borderRadius="md"
+                    >
+                      {selected.status.toUpperCase()}
+                    </Badge>
                   </HStack>
-                  <Badge
-                    colorScheme={
-                      fb.status === "resolved"
-                        ? "green"
-                        : fb.status === "closed"
-                          ? "gray"
-                          : "orange"
-                    }
-                    fontSize="0.9em"
-                    px={3}
-                    py={1}
-                    borderRadius="md"
+                  <Text
+                    mb={2}
+                    fontSize="lg"
+                    fontWeight="semibold"
+                    color={textColor}
                   >
-                    {fb.status.toUpperCase()}
-                  </Badge>
-                </HStack>
-                <Text mt={2} mb={2} noOfLines={2} fontSize="md" fontWeight="medium">
-                  {fb.text || <i>No feedback text</i>}
-                </Text>
-                <HStack justify="space-between" mt={3}>
-                  <Text fontSize="sm" color="gray.400">
-                    {new Date(fb.createdAt).toLocaleString()}
+                    {selected.text}
                   </Text>
-                  <HStack>
+                  <Text fontSize="sm" color={subTextColor}>
+                    {new Date(selected.createdAt).toLocaleString()}
+                  </Text>
+
+                  <HStack mt={4} spacing={3}>
                     <Button
                       size="sm"
-                      colorScheme="blue"
-                      leftIcon={<InfoOutlineIcon />}
-                      variant="solid"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        fetchDetails(fb._id);
-                      }}
+                      colorScheme="green"
+                      onClick={() =>
+                        handleStatusChange(selected._id, "resolved")
+                      }
                     >
-                      Details
+                      Mark as Resolved
                     </Button>
-                    <ConfirmModal
-                      onConfirm={() => handleDeleteFeedback(fb._id)}
-                      title="Delete Feedback"
-                      body="Are you sure you want to delete this feedback? This action cannot be undone."
+                    <Button
+                      size="sm"
+                      colorScheme="gray"
+                      onClick={() => handleStatusChange(selected._id, "closed")}
+                      variant="outline"
                     >
-                      <Button
-                        size="sm"
-                        colorScheme="red"
-                        leftIcon={<DeleteIcon />}
-                        variant="outline"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        Delete
-                      </Button>
-                    </ConfirmModal>
+                      Mark as Closed
+                    </Button>
                   </HStack>
-                </HStack>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
 
-        {/* Feedback Details */}
-        <Box flex="2" minW="350px">
-          {detailsLoading && <Spinner />}
-          {selected && !detailsLoading && (
-            <Box
-              p={6}
-              borderWidth={2}
-              borderRadius="xl"
-              bg={cardBg}
-              boxShadow="lg"
-              borderColor={cardBorder}
-            >
-              <Heading size="md" mb={3} color="blue.400">
-                Feedback Details
-              </Heading>
-              <HStack mb={2}>
-                {selected?.tags?.map((tag) => (
-                  <Tag
-                    key={tag}
-                    colorScheme="purple"
-                    variant="solid"
-                    fontWeight="bold"
-                    borderRadius="full"
-                    px={3}
-                    py={1}
-                    fontSize="sm"
-                  >
-                    {tag}
-                  </Tag>
-                ))}
-                <Badge
-                  colorScheme={
-                    selected.status === "resolved"
-                      ? "green"
-                      : selected.status === "closed"
-                        ? "gray"
-                        : "orange"
-                  }
-                  fontSize="0.9em"
-                  px={3}
-                  py={1}
-                  borderRadius="md"
-                >
-                  {selected.status.toUpperCase()}
-                </Badge>
-              </HStack>
-              <Text mb={2} fontSize="lg" fontWeight="semibold">
-                {selected.text}
-              </Text>
-              <Text fontSize="sm" color="gray.400">
-                {new Date(selected.createdAt).toLocaleString()}
-              </Text>
-              <HStack mt={4} spacing={3}>
-                <Button
-                  size="sm"
-                  colorScheme="green"
-                  onClick={() => handleStatusChange(selected._id, "resolved")}
-                  variant="solid"
-                >
-                  Mark as Resolved
-                </Button>
-                <Button
-                  size="sm"
-                  colorScheme="gray"
-                  onClick={() => handleStatusChange(selected._id, "closed")}
-                  variant="outline"
-                >
-                  Mark as Closed
-                </Button>
-              </HStack>
-              <Box mt={8}>
-                <Heading size="sm" mb={3} color="blue.400">
-                  Comments
-                </Heading>
-                <Stack spacing={3}>
-                  {selected?.comments?.length === 0 && (
-                    <Text color="gray.500">No comments.</Text>
-                  )}
-
-
-                  {selected.comments.map((c) => (
-                    <Box
-                      key={c._id}
-                      p={3}
-                      borderWidth={1}
-                      borderRadius="md"
-                      bg={commentBg}
-                    >
-                      <Text>{c.text}</Text>
-                      <HStack justify="space-between" mt={2}>
-                        <Text fontSize="xs" color="gray.400">
-                          {new Date(c.createdAt).toLocaleString()}
-                        </Text>
-                        <ConfirmModal
-                          onConfirm={() =>
-                            handleDeleteComment(selected._id, c._id)
-                          }
-                          title="Delete Comment"
-                          body="Are you sure you want to delete this comment? This action cannot be undone."
-                        >
-                          <IconButton
-                            size="xs"
-                            colorScheme="red"
-                            icon={<DeleteIcon />}
-                            variant="ghost"
-                            aria-label="Delete comment"
-                          />
-                        </ConfirmModal>
-                      </HStack>
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
-            </Box>
-          )}
+                  <Box mt={8}>
+                    <Heading size="sm" mb={3} color="blue.400">
+                      Comments
+                    </Heading>
+                    <Stack spacing={3}>
+                      {selected?.comments?.length === 0 ? (
+                        <Text color={subTextColor}>No comments.</Text>
+                      ) : (
+                        selected.comments.map((c) => (
+                          <Box
+                            key={c._id}
+                            p={3}
+                            borderWidth={1}
+                            borderRadius="md"
+                            bg={commentBg}
+                          >
+                            <Text color={textColor}>{c.text}</Text>
+                            <HStack justify="space-between" mt={2}>
+                              <Text fontSize="xs" color={subTextColor}>
+                                {new Date(c.createdAt).toLocaleString()}
+                              </Text>
+                              <ConfirmModal
+                                onConfirm={() =>
+                                  handleDeleteComment(selected._id, c._id)
+                                }
+                                title="Delete Comment"
+                                body="Are you sure? This action cannot be undone."
+                              >
+                                <IconButton
+                                  size="xs"
+                                  colorScheme="red"
+                                  icon={<DeleteIcon />}
+                                  variant="ghost"
+                                />
+                              </ConfirmModal>
+                            </HStack>
+                          </Box>
+                        ))
+                      )}
+                    </Stack>
+                  </Box>
+                </MotionBox>
+              )
+            )}
+          </AnimatePresence>
         </Box>
       </Stack>
     </Box>
