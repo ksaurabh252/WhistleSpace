@@ -5,6 +5,7 @@ const AdminAuthContext = createContext();
 
 export const useAdminAuth = () => useContext(AdminAuthContext);
 
+// AdminAuthProvider component to manage admin authentication state and provide login/logout functionality
 export const AdminAuthProvider = ({ children }) => {
   const [token, setToken] = useState(
     localStorage.getItem("adminAccessToken") || ""
@@ -15,6 +16,7 @@ export const AdminAuthProvider = ({ children }) => {
     localStorage.setItem("adminAccessToken", accessToken);
   };
 
+  //
   const logout = async () => {
     try {
       await API.post("/admin/logout", {}, { withCredentials: true });
@@ -24,7 +26,6 @@ export const AdminAuthProvider = ({ children }) => {
       window.location.href = "/admin/login";
       console.error("Logout error:", error);
     } finally {
-      // Always clear local state and storage
       setToken("");
       localStorage.removeItem("adminAccessToken");
       window.location.href = "/admin/login";
