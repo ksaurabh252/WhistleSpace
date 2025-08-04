@@ -78,7 +78,6 @@ const SkeletonCard = ({ bg, border, commentBg, detailed }) => (
   </Box>
 );
 
-
 const AdminDashboard = () => {
   const [feedbacks, setFeedbacks] = useState([]);
   const [filterTag, setFilterTag] = useState("");
@@ -151,6 +150,7 @@ const AdminDashboard = () => {
       setSelected(null);
       fetchFeedbacks();
     } catch (err) {
+      console.error("API call failed:", err);
       handleApiError(err, toast, "Failed to delete feedback");
     }
   };
@@ -258,7 +258,9 @@ const AdminDashboard = () => {
               colorScheme="red"
               leftIcon={<DeleteIcon />}
               variant="outline"
-              onClick={(e) => e.stopPropagation()}
+              onClick={() => {
+                handleDeleteFeedback(fb._id);
+              }}
             >
               Delete
             </Button>
