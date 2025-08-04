@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Box,
-  Spinner,
   Stack,
   Text,
   Tag,
@@ -10,78 +9,114 @@ import {
   Button,
   Alert,
   AlertIcon,
+  Skeleton,
+  SkeletonText,
+  useColorModeValue,
 } from "@chakra-ui/react";
 import { getFeedbacks } from "../api/feedback";
 import { Link } from "react-router-dom";
 import { getErrorMessage } from "../utils/errorHandler";
 
+const FeedbackCardSkeleton = () => {
+  const cardBg = useColorModeValue("white", "gray.800");
+  const cardBorder = useColorModeValue("teal.200", "blue.400");
+
+  return (
+    <Box
+      p={5}
+      borderWidth={2}
+      borderRadius="xl"
+      bg={cardBg}
+      boxShadow="md"
+      borderColor={cardBorder}
+    >
+      <HStack mb={2}>
+        <Skeleton height="24px" width="60px" borderRadius="full" />
+        <Skeleton height="24px" width="60px" borderRadius="full" />
+      </HStack>
+      <SkeletonText mt="4" noOfLines={2} spacing="4" />
+      <HStack justify="space-between" mt={4}>
+        <Skeleton height="20px" width="120px" />
+        <Skeleton height="32px" width="100px" borderRadius="md" />
+      </HStack>
+    </Box>
+  );
+};
+
+// Main FeedbackList component
 const FeedbackList = () => {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const abortControllerRef = useRef(null);
-  const isMountedRef = useRef(true);
+  const timeoutRef = useRef(null);
 
+  // Fetch feedbacks with error handling and timeout
   const fetchFeedbacks = async () => {
-    // Cancel previous request if it exists
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    // Create new abort controller
+    if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
-
     setLoading(true);
     setError("");
     try {
       const res = await getFeedbacks({
         signal: abortControllerRef.current.signal,
       });
-
-      // Only update state if component is still mounted
-      if (isMountedRef.current) {
-        setFeedbacks(res.data);
-      }
+      setFeedbacks(res.data);
     } catch (err) {
-      // Don't set error if request was aborted
       if (
         err.name !== "AbortError" &&
-        err.message === "canceled"
-        &&
-        isMountedRef.current
+        err.message !== "canceled" &&
+        err.code !== "ERR_CANCELED"
       ) {
-        console.log("Fetch aborted:", err);
-        // setError(getErrorMessage(err) || "Failed to load feedback");
-      }
-      else if (isMountedRef.current) {
-        setError(getErrorMessage(err) || 'Failed to load feedback');
+        setError(getErrorMessage(err) || "Failed to load feedback");
       }
     } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
+      setLoading(false);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     }
-
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchFeedbacks();
-    }, 100);
-    // Cleanup function
+    fetchFeedbacks();
+    timeoutRef.current = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+        setError(
+          "Request timed out. Please check your connection or try again."
+        );
+      }
+    }, 10000);
+
     return () => {
-      clearTimeout(timer);
-      isMountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     };
+    // eslint-disable-next-line
   }, []);
-  if (loading) return <Spinner size="lg" />;
+
+  const cardBg = useColorModeValue("white", "gray.800");
+  const cardBorder = useColorModeValue("teal.200", "blue.400");
+  const textColor = useColorModeValue("gray.700", "gray.200");
+  const subTextColor = useColorModeValue("gray.500", "gray.400");
+
+  if (loading)
+    return (
+      <Stack spacing={5}>
+        {[...Array(3)].map((_, i) => (
+          <FeedbackCardSkeleton key={i} />
+        ))}
+      </Stack>
+    );
 
   if (error) {
     return (
-      <Alert status="error">
+      <Alert status="error" borderRadius="md">
         <AlertIcon />
         {error}
         <Button ml={4} size="sm" onClick={fetchFeedbacks}>
@@ -92,27 +127,66 @@ const FeedbackList = () => {
   }
 
   return (
-    <Stack spacing={4}>
-      {feedbacks.length === 0 && <Text>No feedback yet.</Text>}
+    <Stack spacing={5}>
+      {feedbacks.length === 0 && (
+        <Text color="gray.500" textAlign="center">
+          No feedback yet.
+        </Text>
+      )}
       {feedbacks.map((fb) => (
-        <Box key={fb._id} p={4} borderWidth={1} borderRadius="md">
-          <HStack justify="space-between">
+        <Box
+          key={fb._id}
+          p={5}
+          borderWidth={2}
+          borderRadius="xl"
+          bg={cardBg}
+          boxShadow="md"
+          borderColor={cardBorder}
+          _hover={{
+            boxShadow: "xl",
+            transform: "scale(1.01)",
+            borderColor: cardBorder,
+          }}
+          transition="all 0.2s"
+        >
+          <HStack justify="space-between" mb={2}>
             <HStack>
               {fb.tags.map((tag) => (
-                <Tag key={tag} colorScheme="blue">
+                <Tag
+                  key={tag}
+                  colorScheme="purple"
+                  variant="solid"
+                  borderRadius="full"
+                  px={3}
+                  py={1}
+                  fontSize="sm"
+                >
                   {tag}
                 </Tag>
               ))}
             </HStack>
-            <Badge colorScheme={fb.status === "resolved" ? "green" : "orange"}>
-              {fb.status}
+            <Badge
+              colorScheme={fb.status === "resolved" ? "green" : "orange"}
+              fontSize="0.9em"
+              px={3}
+              py={1}
+              borderRadius="md"
+            >
+              {fb.status.toUpperCase()}
             </Badge>
           </HStack>
-          <Text mt={2} mb={2} noOfLines={2}>
+          <Text
+            mt={2}
+            mb={2}
+            fontSize="md"
+            fontWeight="medium"
+            color={textColor}
+            noOfLines={2}
+          >
             {fb.text}
           </Text>
-          <HStack justify="space-between">
-            <Text fontSize="sm" color="gray.500">
+          <HStack justify="space-between" mt={3}>
+            <Text fontSize="sm" color={subTextColor}>
               {new Date(fb.createdAt).toLocaleString()}
             </Text>
             <Button
@@ -121,6 +195,7 @@ const FeedbackList = () => {
               size="sm"
               colorScheme="teal"
               variant="outline"
+              fontWeight="bold"
             >
               View Details
             </Button>
