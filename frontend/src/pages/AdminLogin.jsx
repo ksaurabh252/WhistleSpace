@@ -7,6 +7,8 @@ import {
   Input,
   Heading,
   useToast,
+  Alert,
+  AlertIcon,
 } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
 import { adminLogin } from "../api/admin";
@@ -28,7 +30,7 @@ const AdminLogin = () => {
 
     try {
       const res = await adminLogin({ username, password });
-      localStorage.setItem("", res.data.token);
+
       login(res.data.token);
       toast({
         title: "Login successful",
