@@ -34,6 +34,7 @@ const MotionBox = motion(Box);
 const TAG_OPTIONS = ["bug", "feature", "ui", "performance", "other"];
 const STATUS_COLORS = { resolved: "green", closed: "gray", open: "orange" };
 
+// Skeleton card component for loading states
 const SkeletonCard = ({ bg, border, commentBg, detailed }) => (
   <Box
     p={detailed ? 6 : 5}
@@ -77,6 +78,7 @@ const SkeletonCard = ({ bg, border, commentBg, detailed }) => (
   </Box>
 );
 
+
 const AdminDashboard = () => {
   const [feedbacks, setFeedbacks] = useState([]);
   const [filterTag, setFilterTag] = useState("");
@@ -100,6 +102,7 @@ const AdminDashboard = () => {
   const showToast = (title, status = "success") =>
     toast({ title, status, duration: 3000, isClosable: true });
 
+  // Fetch all feedbacks with filters
   const fetchFeedbacks = async () => {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
@@ -128,6 +131,7 @@ const AdminDashboard = () => {
     return () => abortControllerRef.current?.abort();
   }, [filterTag, filterStatus]);
 
+  // Handle status change for feedback
   const handleStatusChange = async (id, status) => {
     try {
       await updateFeedbackStatus(id, status);
@@ -139,6 +143,7 @@ const AdminDashboard = () => {
     }
   };
 
+  // Handle feedback deletion
   const handleDeleteFeedback = async (id) => {
     try {
       await deleteFeedback(id);
@@ -150,6 +155,7 @@ const AdminDashboard = () => {
     }
   };
 
+  // Fetch details of a specific feedback
   const fetchDetails = async (id) => {
     setDetailsLoading(true);
     try {
@@ -161,6 +167,7 @@ const AdminDashboard = () => {
     setDetailsLoading(false);
   };
 
+  // Handle comment deletion
   const handleDeleteComment = async (feedbackId, commentId) => {
     try {
       await deleteComment(feedbackId, commentId);
@@ -171,6 +178,7 @@ const AdminDashboard = () => {
     }
   };
 
+  // Render feedback card
   const FeedbackCard = ({ fb }) => (
     <Box
       p={5}
