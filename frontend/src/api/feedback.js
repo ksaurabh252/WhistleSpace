@@ -1,8 +1,4 @@
-import axios from "axios";
-
-const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
-});
+import API from "./axios.js";
 
 // Feedback APIs
 export const createFeedback = (data, config = {}) =>
@@ -15,5 +11,3 @@ export const getFeedbackById = (id, config = {}) =>
 
 export const addComment = (id, data, config = {}) =>
   API.post(`/feedback/${id}/comment`, data, config);
-
-export default API;
