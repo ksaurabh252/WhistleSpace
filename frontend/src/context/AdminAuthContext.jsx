@@ -18,16 +18,15 @@ export const AdminAuthProvider = ({ children }) => {
 
   //
   const logout = async () => {
+    // 1. Immediately clear local state and storage to prevent using old tokens.
+    setToken("");
+    localStorage.removeItem("adminAccessToken");
+
     try {
       await API.post("/admin/logout", {}, { withCredentials: true });
     } catch (error) {
-      setToken("");
-      localStorage.removeItem("adminAccessToken");
-      window.location.href = "/admin/login";
       console.error("Logout error:", error);
     } finally {
-      setToken("");
-      localStorage.removeItem("adminAccessToken");
       window.location.href = "/admin/login";
     }
   };
