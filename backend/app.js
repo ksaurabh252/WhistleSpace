@@ -11,22 +11,26 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(morgan("dev"));
 
-// CORS should be before routes!
+// CORS configuration
 const allowedOrigins = [
-  process.env.FRONTEND_URL || "http://localhost:3000",
+  process.env.FRONTEND_URL || "http://localhost:5173",
   "http://localhost:5173",
+  "http://localhost:3000",
+  "https://whistlespace.vercel.app",
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg =
-          "The CORS policy for this site does not allow access from the specified Origin.";
-        return callback(new Error(msg), false);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(
+          new Error("CORS policy: This origin is not allowed: " + origin),
+          false
+        );
       }
-      return callback(null, true);
     },
     credentials: true,
   })
