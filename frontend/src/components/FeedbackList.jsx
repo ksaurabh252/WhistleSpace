@@ -20,7 +20,6 @@ import { getErrorMessage } from "../utils/errorHandler";
 const FeedbackCardSkeleton = () => {
   const cardBg = useColorModeValue("white", "gray.800");
   const cardBorder = useColorModeValue("teal.200", "blue.400");
-
   return (
     <Box
       p={5}
@@ -43,7 +42,6 @@ const FeedbackCardSkeleton = () => {
   );
 };
 
-// Main FeedbackList component
 const FeedbackList = () => {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -51,7 +49,12 @@ const FeedbackList = () => {
   const abortControllerRef = useRef(null);
   const timeoutRef = useRef(null);
 
-  // Fetch feedbacks with error handling and timeout
+  // Color mode values - same as AdminDashboard
+  const cardBg = useColorModeValue("white", "gray.800");
+  const cardBorder = useColorModeValue("teal.200", "blue.400");
+  const textColor = useColorModeValue("gray.700", "gray.200");
+  const subTextColor = useColorModeValue("gray.500", "gray.400");
+
   const fetchFeedbacks = async () => {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
@@ -61,7 +64,11 @@ const FeedbackList = () => {
       const res = await getFeedbacks({
         signal: abortControllerRef.current.signal,
       });
-      setFeedbacks(res.data);
+
+      // FIXED: Same as AdminDashboard
+      setFeedbacks(res.data || []);
+      setTimeout(() => setLoading(false), 150);
+
     } catch (err) {
       if (
         err.name !== "AbortError" &&
@@ -70,8 +77,8 @@ const FeedbackList = () => {
       ) {
         setError(getErrorMessage(err) || "Failed to load feedback");
       }
-    } finally {
       setLoading(false);
+    } finally {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -97,13 +104,7 @@ const FeedbackList = () => {
         timeoutRef.current = null;
       }
     };
-    // eslint-disable-next-line
   }, []);
-
-  const cardBg = useColorModeValue("white", "gray.800");
-  const cardBorder = useColorModeValue("teal.200", "blue.400");
-  const textColor = useColorModeValue("gray.700", "gray.200");
-  const subTextColor = useColorModeValue("gray.500", "gray.400");
 
   if (loading)
     return (
@@ -128,80 +129,100 @@ const FeedbackList = () => {
 
   return (
     <Stack spacing={5}>
-      {feedbacks.length === 0 && (
-        <Text color="gray.500" textAlign="center">
-          No feedback yet.
-        </Text>
-      )}
-      {feedbacks.map((fb) => (
+      {/* FIXED: Same styled empty state as AdminDashboard */}
+      {feedbacks.length === 0 ? (
         <Box
-          key={fb._id}
-          p={5}
-          borderWidth={2}
-          borderRadius="xl"
+          textAlign="center"
+          py={10}
+          px={6}
           bg={cardBg}
-          boxShadow="md"
+          borderRadius="xl"
+          borderWidth={2}
+          borderStyle="dashed"
           borderColor={cardBorder}
-          _hover={{
-            boxShadow: "xl",
-            transform: "scale(1.01)",
-            borderColor: cardBorder,
-          }}
-          transition="all 0.2s"
+          boxShadow="md"
         >
-          <HStack justify="space-between" mb={2}>
-            <HStack>
-              {fb.tags.map((tag) => (
-                <Tag
-                  key={tag}
-                  colorScheme="purple"
-                  variant="solid"
-                  borderRadius="full"
-                  px={3}
-                  py={1}
-                  fontSize="sm"
-                >
-                  {tag}
-                </Tag>
-              ))}
-            </HStack>
-            <Badge
-              colorScheme={fb.status === "resolved" ? "green" : "orange"}
-              fontSize="0.9em"
-              px={3}
-              py={1}
-              borderRadius="md"
-            >
-              {fb.status.toUpperCase()}
-            </Badge>
-          </HStack>
-          <Text
-            mt={2}
-            mb={2}
-            fontSize="md"
-            fontWeight="medium"
-            color={textColor}
-            noOfLines={2}
-          >
-            {fb.text}
+          <Text fontSize="xl" color={subTextColor} mb={3} fontWeight="semibold">
+            📝 No feedback yet
           </Text>
-          <HStack justify="space-between" mt={3}>
-            <Text fontSize="sm" color={subTextColor}>
-              {new Date(fb.createdAt).toLocaleString()}
-            </Text>
-            <Button
-              as={Link}
-              to={`/feedback/${fb._id}`}
-              size="sm"
-              colorScheme="teal"
-              variant="outline"
-              fontWeight="bold"
-            >
-              View Details
-            </Button>
-          </HStack>
+          <Text fontSize="md" color={subTextColor} mb={4}>
+            Be the first to share your thoughts and help us improve!
+          </Text>
+          <Text fontSize="sm" color={subTextColor}>
+            Your anonymous feedback is valuable to us. 💭
+          </Text>
         </Box>
-      ))}
+      ) : (
+        feedbacks.map((fb) => (
+          <Box
+            key={fb._id}
+            p={5}
+            borderWidth={2}
+            borderRadius="xl"
+            bg={cardBg}
+            boxShadow="md"
+            borderColor={cardBorder}
+            _hover={{
+              boxShadow: "xl",
+              transform: "scale(1.01)",
+              borderColor: cardBorder,
+            }}
+            transition="all 0.2s"
+          >
+            <HStack justify="space-between" mb={2}>
+              <HStack>
+                {fb.tags.map((tag) => (
+                  <Tag
+                    key={tag}
+                    colorScheme="purple"
+                    variant="solid"
+                    borderRadius="full"
+                    px={3}
+                    py={1}
+                    fontSize="sm"
+                  >
+                    {tag}
+                  </Tag>
+                ))}
+              </HStack>
+              <Badge
+                colorScheme={fb.status === "resolved" ? "green" : "orange"}
+                fontSize="0.9em"
+                px={3}
+                py={1}
+                borderRadius="md"
+              >
+                {fb.status.toUpperCase()}
+              </Badge>
+            </HStack>
+            <Text
+              mt={2}
+              mb={2}
+              fontSize="md"
+              fontWeight="medium"
+              color={textColor}
+              noOfLines={2}
+            >
+              {fb.text}
+            </Text>
+            <HStack justify="space-between" mt={3}>
+              <Text fontSize="sm" color={subTextColor}>
+                {new Date(fb.createdAt).toLocaleString()}
+              </Text>
+              <Button
+                as={Link}
+                to={`/feedback/${fb._id}`}
+                size="sm"
+                colorScheme="teal"
+                variant="outline"
+                fontWeight="bold"
+              >
+                View Details
+              </Button>
+            </HStack>
+          </Box>
+        ))
+      )}
     </Stack>
   );
 };
