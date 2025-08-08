@@ -1,29 +1,32 @@
-# 🚀 WhistleSpace Frontend
+# 🚀 WhistleSpace Backend
 
-WhistleSpace is a modern, anonymous feedback platform for schools, startups, and organizations. This is the **frontend** built with React and Chakra UI, providing a clean, responsive, and user-friendly interface for both users and admins.
+WhistleSpace is a modern, secure, and anonymous feedback platform for schools, startups, and organizations. This **backend** is built with Node.js, Express, and MongoDB, providing robust APIs, admin authentication, email notifications, and optional AI moderation.
 
 ---
 
 ## ✨ Features
 
-- **Anonymous Feedback Submission:** Anyone can submit feedback without logging in.
-- **Tagging & Categorization:** Feedback can be tagged (e.g., bug, feature, UI, etc.).
-- **Comment Threads:** Users and admins can comment on feedback (optionally anonymous).
-- **Admin Dashboard:** Secure login for admins to view, filter, resolve, and moderate feedback.
-- **Email Notifications:** Admins receive notifications for new feedback (when backend is configured).
-- **AI Moderation:** (Optional) Feedback is checked for inappropriate content.
-- **Responsive Design:** Works beautifully on desktop and mobile.
+- **Anonymous Feedback Submission:** Users can submit feedback without revealing their identity.
+- **Tagging & Categorization:** Feedback can be tagged for easy filtering (e.g., bug, feature, UI, etc.).
+- **Comment Threads:** Add and moderate comments on feedback.
+- **Admin Authentication:** Secure JWT-based login with access and refresh tokens.
+- **Admin Dashboard APIs:** Endpoints for viewing, filtering, resolving, and deleting feedback and comments.
+- **Email Notifications:** Sends email to admin on new feedback (configurable).
+- **AI Moderation:** (Optional) Uses OpenAI API to flag inappropriate feedback.
+- **Rate Limiting & CORS:** Secure and production-ready.
+- **Refresh Token System:** Secure session management with HTTP-only cookies.
+- **Environment Variables:** All sensitive data and config are managed via `.env`.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **React 19**
-- **Chakra UI** (for styling and components)
-- **Axios** (for API requests)
-- **React Router** (for routing)
-- **Vite** (for fast development)
-- **Context API** (for admin authentication)
+- **Node.js** & **Express**
+- **MongoDB** & **Mongoose**
+- **JWT** (access & refresh tokens)
+- **Nodemailer** (for email notifications)
+- **OpenAI API** (for moderation, optional)
+- **dotenv**, **cookie-parser**, **express-rate-limit**
 
 ---
 
@@ -32,8 +35,8 @@ WhistleSpace is a modern, anonymous feedback platform for schools, startups, and
 ### 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/yourusername/whistlespace-frontend.git
-cd whistlespace-frontend
+git clone https://github.com/yourusername/whistlespace-backend.git
+cd whistlespace-backend
 ```
 
 ### 2. **Install dependencies**
@@ -42,51 +45,80 @@ cd whistlespace-frontend
 npm install
 ```
 
-### 3. **Configure environment variables**
+### 3. **Configure Environment Variables**
 
-Create a `.env` file in the root directory and add:
+Create a `.env` file in the root directory with the following content:
 
 ```
-VITE_API_URL=http://localhost:5000
+MONGO_URI=mongodb://localhost:27017/whistlespace
+PORT=5000
+FRONTEND_URL=http://localhost:5173
+
+JWT_SECRET=your_access_token_secret
+JWT_REFRESH_SECRET=your_refresh_token_secret
+
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=465
+EMAIL_SECURE=true
+EMAIL_USER=yourgmail@gmail.com
+EMAIL_PASS=yourStrongPassword
+ADMIN_EMAIL=admin@example.com
+
+OPENAI_API_KEY=sk-...   # (Optional, for AI moderation)
 ```
 
-> Make sure this URL matches your backend server address.
+> **Note:**
+>
+> - Update the values with your own credentials and secrets.
+> - `OPENAI_API_KEY` is optional (for AI moderation).
 
-### 4. **Start the app**
+### 4. **Start the server**
 
 ```bash
-npm run dev
+npm start
 ```
 
-The app will run on [http://localhost:5173](http://localhost:5173) by default.
+The server will run at [http://localhost:5000](http://localhost:5000) by default.
 
 ---
 
-## 🖥️ Usage
+## 🖥️ API Endpoints
 
-- **Feedback Board:**  
-  Visit `/` to submit and view feedback anonymously.
-
-- **Admin Login:**  
-  Visit `/admin/login` to log in as admin.  
-  After login, access the dashboard at `/admin/dashboard`.
-
-- **Feedback Details:**  
-  Click "View Details" on any feedback to see comments and add your own.
+- `POST /admin/init` — **(First time only)** Create an admin user
+- `POST /admin/login` — Admin login (returns access token, sets refresh token cookie)
+- `POST /admin/refresh` — Refresh access token using refresh token cookie
+- `POST /admin/logout` — Logout and invalidate refresh token
+- `POST /feedback` — Submit anonymous feedback
+- `GET /feedback` — List all feedback (with optional filters)
+- `GET /feedback/:id` — Get feedback details and comments
+- `POST /feedback/:id/comment` — Add a comment
+- `PATCH /feedback/:id` — Update feedback status (admin only)
+- `DELETE /feedback/:id` — Delete feedback and its comments (admin only)
+- `DELETE /feedback/:feedbackId/comment/:commentId` — Delete a comment (admin only)
 
 ---
 
 ## 📁 Project Structure
 
 ```
-src/
-  api/           # API request functions
-  components/    # Reusable UI components
-  context/       # Context providers (e.g., admin auth)
-  pages/         # Page components (routes)
-  utils/         # Utility functions
-  App.jsx        # Main app component
-  main.jsx       # Entry point
+.
+├── controllers/
+├── middleware/
+│   └── auth.js
+├── models/
+│   ├── Admin.model.js
+│   ├── Comment.model.js
+│   └── Feedback.model.js
+├── routes/
+│   ├── admin.routes.js
+│   └── feedback.routes.js
+├── utils/
+│   ├── moderateFeedback.js
+│   └── sendEmail.js
+├── app.js
+├── server.js
+├── .env
+└── package.json
 ```
 
 ---
@@ -105,9 +137,10 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 
 ## 🙏 Acknowledgements
 
-- [Chakra UI](https://chakra-ui.com/)
-- [React](https://react.dev/)
-- [Vite](https://vitejs.dev/)
+- [Express](https://expressjs.com/)
+- [MongoDB](https://www.mongodb.com/)
+- [Nodemailer](https://nodemailer.com/)
+- [OpenAI](https://openai.com/)
 
 ---
 
