@@ -1,5 +1,3 @@
-markdown
-
 # 🚀 WhistleSpace
 
 **WhistleSpace** is a modern, secure, and anonymous feedback platform for schools, startups, and organizations. It empowers users to submit feedback and concerns without revealing their identity, while providing admins with a powerful dashboard for moderation and response.
@@ -22,16 +20,17 @@ markdown
 - **Comment Threads**
 - **Admin Dashboard with Secure Login**
 - **Email Notifications for Admins**
-- **AI Moderation (Optional)**
-- **Responsive, Modern UI**
+- **AI Moderation (Optional, via OpenAI API)**
 - **JWT Access & Refresh Token Authentication**
+- **Rate Limiting & CORS Security**
+- **Responsive, Modern UI**
 
 ---
 
 ## 🛠️ Tech Stack
 
 - **Frontend:** React, Chakra UI, Axios, React Router, Vite
-- **Backend:** Node.js, Express, MongoDB, Mongoose, JWT, Nodemailer, OpenAI API (optional)
+- **Backend:** Node.js, Express, MongoDB, Mongoose, JWT (access & refresh tokens), Nodemailer, OpenAI API (optional)
 
 ---
 
@@ -70,7 +69,7 @@ npm install
   EMAIL_PASS=yourStrongPassword
   ADMIN_EMAIL=admin@example.com
 
-  OPENAI_API_KEY=sk-...
+  OPENAI_API_KEY=sk-...   # (Optional, for AI moderation)
   ```
 
 - Start the backend server:
