@@ -1,18 +1,19 @@
 # 🚀 WhistleSpace Backend
 
-WhistleSpace is a modern, secure, and anonymous feedback platform for schools, startups, and organizations. This is the **backend** built with Node.js, Express, and MongoDB, providing robust APIs, admin authentication, email notifications, and optional AI moderation.
+WhistleSpace is a modern, secure, and anonymous feedback platform for schools, startups, and organizations. This **backend** is built with Node.js, Express, and MongoDB, providing robust APIs, admin authentication, email notifications, and optional AI moderation.
 
 ---
 
 ## ✨ Features
 
-- **Anonymous Feedback Submission:** Users can submit feedback without revealing their identity.
+- **Anonymous Feedback:** Users can submit feedback without revealing their identity.
 - **Comment Threads:** Add and moderate comments on feedback.
 - **Admin Authentication:** Secure JWT-based login with access and refresh tokens.
-- **Admin Dashboard APIs:** View, filter, resolve, and delete feedback and comments.
-- **Email Notifications:** Sends email to admin on new feedback (configurable).
+- **Admin APIs:** Endpoints to view, filter, resolve, and delete feedback and comments.
+- **Email Notifications:** Sends email alerts to admin on new feedback (configurable).
 - **AI Moderation:** (Optional) Uses OpenAI API to flag inappropriate feedback.
 - **Rate Limiting & CORS:** Secure and production-ready.
+- **Refresh Token System:** Secure session management with HTTP-only cookies.
 
 ---
 
@@ -42,7 +43,7 @@ cd whistlespace-backend
 npm install
 ```
 
-### 3. **Create a `.env` file**
+### 3. **Configure Environment Variables**
 
 Create a `.env` file in the root directory with the following content:
 
@@ -61,12 +62,12 @@ EMAIL_USER=yourgmail@gmail.com
 EMAIL_PASS=yourStrongPassword
 ADMIN_EMAIL=admin@example.com
 
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=sk-...   # (Optional, for AI moderation)
 ```
 
 > **Note:**
 >
-> - Replace values as needed.
+> - Update the values with your own credentials and secrets.
 > - `OPENAI_API_KEY` is optional (for AI moderation).
 
 ### 4. **Start the server**
@@ -75,7 +76,7 @@ OPENAI_API_KEY=sk-...
 npm start
 ```
 
-The server will run on [http://localhost:5000](http://localhost:5000) by default.
+The server will run at [http://localhost:5000](http://localhost:5000) by default.
 
 ---
 
@@ -106,6 +107,7 @@ The server will run on [http://localhost:5000](http://localhost:5000) by default
 
 ## 🖥️ API Endpoints
 
+- `POST /admin/init` — **(First time only)** Create an admin user
 - `POST /admin/login` — Admin login (returns access token, sets refresh token cookie)
 - `POST /admin/refresh` — Refresh access token using refresh token cookie
 - `POST /admin/logout` — Logout and invalidate refresh token
