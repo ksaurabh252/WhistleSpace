@@ -16,7 +16,22 @@ import {
 import { getFeedbacks } from "../api/feedback";
 import { Link } from "react-router-dom";
 import { getErrorMessage } from "../utils/errorHandler";
+import { keyframes } from "@emotion/react";
 
+const breathingAnimation = keyframes`
+  0% { 
+    border-color: var(--chakra-colors-teal-200);
+     box-shadow: 0 0 5px rgba(45, 212, 191, 0.2);
+  }
+  50% { 
+   border-color: var(--chakra-colors-teal-300);
+    box-shadow: 0 0 15px rgba(45, 212, 191, 0.4);
+  }
+  100% { 
+    border-color: var(--chakra-colors-teal-200);
+   box-shadow: 0 0 5px rgba(45, 212, 191, 0.2);
+  }
+`;
 const FeedbackCardSkeleton = () => {
   const cardBg = useColorModeValue("white", "gray.800");
   const cardBorder = useColorModeValue("teal.200", "blue.400");
@@ -141,6 +156,12 @@ const FeedbackList = () => {
           borderStyle="dashed"
           borderColor={cardBorder}
           boxShadow="md"
+          animation={`${breathingAnimation} 3s ease-in-out infinite`}
+          _hover={{
+            animation: `${breathingAnimation} 1.5s ease-in-out infinite`,
+            transform: "translateY(-2px)",
+          }}
+          transition="transform 0.3s ease"
         >
           <Text fontSize="xl" color={subTextColor} mb={3} fontWeight="semibold">
             📝 No feedback yet

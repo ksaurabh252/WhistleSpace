@@ -18,7 +18,7 @@ import {
   SkeletonText,
 } from "@chakra-ui/react";
 import { InfoOutlineIcon, DeleteIcon } from "@chakra-ui/icons";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion"; import { keyframes } from "@emotion/react";
 import {
   getAllFeedbacks,
   updateFeedbackStatus,
@@ -33,6 +33,21 @@ import { getErrorMessage, handleApiError } from "../utils/errorHandler";
 const MotionBox = motion(Box);
 const TAG_OPTIONS = ["bug", "feature", "ui", "performance", "other"];
 const STATUS_COLORS = { resolved: "green", closed: "gray", open: "orange" };
+
+const breathingAnimation = keyframes`
+  0% { 
+    border-color: var(--chakra-colors-teal-200);
+     box-shadow: 0 0 5px rgba(45, 212, 191, 0.2);
+  }
+  50% { 
+   border-color: var(--chakra-colors-teal-300);
+    box-shadow: 0 0 15px rgba(45, 212, 191, 0.4);
+  }
+  100% { 
+    border-color: var(--chakra-colors-teal-200);
+   box-shadow: 0 0 5px rgba(45, 212, 191, 0.2);
+  }
+`;
 
 const SkeletonCard = ({ bg, border, commentBg, detailed }) => (
   <Box
@@ -360,6 +375,13 @@ const AdminDashboard = () => {
                   borderWidth={2}
                   borderStyle="dashed"
                   borderColor={cardBorder}
+                  boxShadow="md"
+                  animation={`${breathingAnimation} 3s ease-in-out infinite`}
+                  _hover={{
+                    animation: `${breathingAnimation} 1.5s ease-in-out infinite`,
+                    transform: "translateY(-2px)",
+                  }}
+                  transition="transform 0.3s ease"
                 >
                   <Text fontSize="lg" color={subTextColor} mb={2}>
                     📝 No feedback found
