@@ -34,7 +34,6 @@ const MotionBox = motion(Box);
 const TAG_OPTIONS = ["bug", "feature", "ui", "performance", "other"];
 const STATUS_COLORS = { resolved: "green", closed: "gray", open: "orange" };
 
-// Skeleton card component for loading states
 const SkeletonCard = ({ bg, border, commentBg, detailed }) => (
   <Box
     p={detailed ? 6 : 5}
@@ -101,36 +100,39 @@ const AdminDashboard = () => {
   const showToast = (title, status = "success") =>
     toast({ title, status, duration: 3000, isClosable: true });
 
-  // Fetch all feedbacks with filters
   const fetchFeedbacks = async () => {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
+
     setLoading(true);
     setError("");
+
     try {
       const params = {};
       if (filterTag) params.tags = filterTag;
       if (filterStatus) params.status = filterStatus;
+
       const res = await getAllFeedbacks(params, {
         signal: abortControllerRef.current.signal,
       });
-      setFeedbacks(res.data);
+
+      // SIMPLE FIX: Set data first, then loading false
+      setFeedbacks(res.data || []);
+      setTimeout(() => setLoading(false), 150); // Small delay
+
     } catch (err) {
       if (err.name !== "AbortError" && err.message !== "canceled") {
         setError(getErrorMessage(err));
         handleApiError(err, toast, "Failed to load feedback");
       }
-    } finally {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     fetchFeedbacks();
     return () => abortControllerRef.current?.abort();
   }, [filterTag, filterStatus]);
 
-  // Handle status change for feedback
   const handleStatusChange = async (id, status) => {
     try {
       await updateFeedbackStatus(id, status);
@@ -142,7 +144,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Handle feedback deletion
   const handleDeleteFeedback = async (id) => {
     try {
       await deleteFeedback(id);
@@ -155,7 +156,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Fetch details of a specific feedback
   const fetchDetails = async (id) => {
     setDetailsLoading(true);
     try {
@@ -167,7 +167,6 @@ const AdminDashboard = () => {
     setDetailsLoading(false);
   };
 
-  // Handle comment deletion
   const handleDeleteComment = async (feedbackId, commentId) => {
     try {
       await deleteComment(feedbackId, commentId);
@@ -178,7 +177,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Render feedback card
   const FeedbackCard = ({ fb }) => (
     <Box
       p={5}
@@ -236,15 +234,12 @@ const AdminDashboard = () => {
         <Text fontSize="sm" color={subTextColor}>
           {new Date(fb.createdAt).toLocaleString()}
         </Text>
-        <HStack>
+        <HStack onClick={(e) => e.stopPropagation()}>
           <Button
             size="sm"
             colorScheme="teal"
             leftIcon={<InfoOutlineIcon />}
-            onClick={(e) => {
-              e.stopPropagation();
-              fetchDetails(fb._id);
-            }}
+            onClick={() => fetchDetails(fb._id)}
           >
             Details
           </Button>
@@ -258,9 +253,6 @@ const AdminDashboard = () => {
               colorScheme="red"
               leftIcon={<DeleteIcon />}
               variant="outline"
-              onClick={() => {
-                handleDeleteFeedback(fb._id);
-              }}
             >
               Delete
             </Button>
@@ -344,6 +336,7 @@ const AdminDashboard = () => {
           <Heading size="md" mb={4} color="teal.400">
             Feedback List
           </Heading>
+
           {loading ? (
             <Stack spacing={5}>
               {[...Array(3)].map((_, i) => (
@@ -357,9 +350,43 @@ const AdminDashboard = () => {
             </Stack>
           ) : (
             <Stack spacing={5}>
-              {feedbacks.map((fb) => (
-                <FeedbackCard key={fb._id} fb={fb} />
-              ))}
+              {feedbacks.length === 0 ? (
+                <Box
+                  textAlign="center"
+                  py={10}
+                  px={6}
+                  bg={cardBg}
+                  borderRadius="xl"
+                  borderWidth={2}
+                  borderStyle="dashed"
+                  borderColor={cardBorder}
+                >
+                  <Text fontSize="lg" color={subTextColor} mb={2}>
+                    📝 No feedback found
+                  </Text>
+                  <Text fontSize="sm" color={subTextColor}>
+                    {filterTag || filterStatus
+                      ? "Try adjusting your filters or clear them to see all feedback."
+                      : "No feedback has been submitted yet."}
+                  </Text>
+                  {(filterTag || filterStatus) && (
+                    <Button
+                      mt={3}
+                      size="sm"
+                      colorScheme="teal"
+                      variant="outline"
+                      onClick={() => {
+                        setFilterTag("");
+                        setFilterStatus("");
+                      }}
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </Box>
+              ) : (
+                feedbacks.map((fb) => <FeedbackCard key={fb._id} fb={fb} />)
+              )}
             </Stack>
           )}
         </Box>
@@ -428,7 +455,6 @@ const AdminDashboard = () => {
                   <Text fontSize="sm" color={subTextColor}>
                     {new Date(selected.createdAt).toLocaleString()}
                   </Text>
-
                   <HStack mt={4} spacing={3}>
                     <Button
                       size="sm"
@@ -448,14 +474,25 @@ const AdminDashboard = () => {
                       Mark as Closed
                     </Button>
                   </HStack>
-
                   <Box mt={8}>
                     <Heading size="sm" mb={3} color="blue.400">
                       Comments
                     </Heading>
                     <Stack spacing={3}>
                       {selected?.comments?.length === 0 ? (
-                        <Text color={subTextColor}>No comments.</Text>
+                        <Box
+                          textAlign="center"
+                          py={6}
+                          px={4}
+                          bg={commentBg}
+                          borderRadius="md"
+                          borderWidth={1}
+                          borderStyle="dashed"
+                        >
+                          <Text color={subTextColor} fontSize="sm">
+                            💬 No comments yet
+                          </Text>
+                        </Box>
                       ) : (
                         selected.comments.map((c) => (
                           <Box
