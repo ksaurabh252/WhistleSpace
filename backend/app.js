@@ -5,13 +5,13 @@ const cors = require("cors");
 const feedbackRoutes = require("./routes/feedback.routes");
 const adminRoutes = require("./routes/admin.routes");
 const cookieParser = require("cookie-parser");
-const app = express();
-app.use(cookieParser());
 
+const app = express();
+
+app.use(cookieParser());
 app.use(express.json());
 app.use(morgan("dev"));
 
-// CORS configuration
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:5173",
   "http://localhost:5173",
@@ -36,23 +36,68 @@ app.use(
   })
 );
 
-// Rate limiting before routes
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: "Too many requests from this IP, please try again later.",
-});
-app.use(limiter);
+// Rate limiting configuration - only for production
+if (process.env.NODE_ENV === "production") {
+  // General rate limiter for all routes
+  const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000,
+    message: {
+      error: "Too many requests from this IP, please try again later.",
+      retryAfter: "15 minutes",
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
-// Now your routes
+  // Stricter rate limiter for feedback submissions
+  const feedbackLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 50,
+    message: {
+      error:
+        "Too many feedback submissions from this IP, please try again later.",
+      retryAfter: "15 minutes",
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Moderate rate limiter for admin login attempts
+  const adminLoginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10,
+    message: {
+      error: "Too many login attempts from this IP, please try again later.",
+      retryAfter: "15 minutes",
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+  });
+
+  // Apply rate limiters
+  app.use(generalLimiter); // Apply to all routes
+  app.use("/feedback", feedbackLimiter); // Additional limit for feedback routes
+  app.use("/admin/login", adminLoginLimiter); // Additional limit for admin login
+} else {
+  console.log("Rate limiting disabled in development environment");
+}
+
+// Routes
 app.use("/feedback", feedbackRoutes);
 app.use("/admin", adminRoutes);
 
 app.get("/", (req, res) => {
-  res.json({ message: "WhistleSpace API Running" });
+  res.json({
+    message: "WhistleSpace API Running",
+    environment: process.env.NODE_ENV || "development",
+    rateLimiting:
+      process.env.NODE_ENV === "production" ? "enabled" : "disabled",
+  });
 });
 
-// Error handler
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: err.message || "Internal Server Error" });
