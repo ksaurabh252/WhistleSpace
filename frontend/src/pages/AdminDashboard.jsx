@@ -1,3 +1,6 @@
+// Admin Dashboard: view, filter, update, and delete feedback and comments.
+// Uses Chakra UI for styling and Framer Motion for smooth detail transitions.
+
 import { useEffect, useRef, useState } from "react";
 import {
   Box,
@@ -18,7 +21,9 @@ import {
   SkeletonText,
 } from "@chakra-ui/react";
 import { InfoOutlineIcon, DeleteIcon } from "@chakra-ui/icons";
-import { motion, AnimatePresence } from "framer-motion"; import { keyframes } from "@emotion/react";
+import { motion, AnimatePresence } from "framer-motion";
+import { keyframes } from "@emotion/react";
+
 import {
   getAllFeedbacks,
   updateFeedbackStatus,
@@ -30,25 +35,21 @@ import { useAdminAuth } from "../context/AdminAuthContext";
 import ConfirmModal from "../components/ConfirmModal";
 import { getErrorMessage, handleApiError } from "../utils/errorHandler";
 
+// Motion wrapper for animated detail panel
 const MotionBox = motion(Box);
+
+// Static options and status -> color mapping
 const TAG_OPTIONS = ["bug", "feature", "ui", "performance", "other"];
 const STATUS_COLORS = { resolved: "green", closed: "gray", open: "orange" };
 
+// Subtle breathing border animation for empty states
 const breathingAnimation = keyframes`
-  0% { 
-    border-color: var(--chakra-colors-teal-200);
-     box-shadow: 0 0 5px rgba(45, 212, 191, 0.2);
-  }
-  50% { 
-   border-color: var(--chakra-colors-teal-300);
-    box-shadow: 0 0 15px rgba(45, 212, 191, 0.4);
-  }
-  100% { 
-    border-color: var(--chakra-colors-teal-200);
-   box-shadow: 0 0 5px rgba(45, 212, 191, 0.2);
-  }
+  0% { border-color: var(--chakra-colors-teal-200); box-shadow: 0 0 5px rgba(45, 212, 191, 0.2); }
+  50% { border-color: var(--chakra-colors-teal-300); box-shadow: 0 0 15px rgba(45, 212, 191, 0.4); }
+  100% { border-color: var(--chakra-colors-teal-200); box-shadow: 0 0 5px rgba(45, 212, 191, 0.2); }
 `;
 
+// Loading placeholder card (used in list and details)
 const SkeletonCard = ({ bg, border, commentBg, detailed }) => (
   <Box
     p={detailed ? 6 : 5}
@@ -93,6 +94,7 @@ const SkeletonCard = ({ bg, border, commentBg, detailed }) => (
 );
 
 const AdminDashboard = () => {
+  // Filters, selections, and UI states
   const [feedbacks, setFeedbacks] = useState([]);
   const [filterTag, setFilterTag] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -100,10 +102,15 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Utilities: toast + auth
   const toast = useToast();
   const { logout } = useAdminAuth();
+
+  // Abort controller for canceling in-flight requests
   const abortControllerRef = useRef(null);
 
+  // Theme-aware colors
   const cardBg = useColorModeValue("white", "gray.800");
   const cardSelectedBg = useColorModeValue("teal.50", "blue.900");
   const cardBorder = useColorModeValue("teal.200", "blue.400");
@@ -112,16 +119,18 @@ const AdminDashboard = () => {
   const subTextColor = useColorModeValue("gray.500", "gray.400");
   const commentBg = useColorModeValue("gray.50", "gray.700");
 
+  // Helper to show quick toasts
   const showToast = (title, status = "success") =>
     toast({ title, status, duration: 3000, isClosable: true });
 
+  // Load feedback list (with filters) + cancellation support
   const fetchFeedbacks = async () => {
+    // Cancel previous request if any
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
 
     setLoading(true);
     setError("");
-
     try {
       const params = {};
       if (filterTag) params.tags = filterTag;
@@ -130,12 +139,12 @@ const AdminDashboard = () => {
       const res = await getAllFeedbacks(params, {
         signal: abortControllerRef.current.signal,
       });
-
-      // SIMPLE FIX: Set data first, then loading false
       setFeedbacks(res.data || []);
-      setTimeout(() => setLoading(false), 150); // Small delay
 
+      // Tiny delay to avoid skeleton flicker
+      setTimeout(() => setLoading(false), 150);
     } catch (err) {
+      // Ignore cancels; show other errors
       if (err.name !== "AbortError" && err.message !== "canceled") {
         setError(getErrorMessage(err));
         handleApiError(err, toast, "Failed to load feedback");
@@ -143,11 +152,14 @@ const AdminDashboard = () => {
       setLoading(false);
     }
   };
+
+  // Refetch when filters change; cleanup on unmount
   useEffect(() => {
     fetchFeedbacks();
     return () => abortControllerRef.current?.abort();
   }, [filterTag, filterStatus]);
 
+  // Update feedback status; refresh list and details (if open)
   const handleStatusChange = async (id, status) => {
     try {
       await updateFeedbackStatus(id, status);
@@ -159,6 +171,7 @@ const AdminDashboard = () => {
     }
   };
 
+  // Delete a feedback; clear selection and refresh
   const handleDeleteFeedback = async (id) => {
     try {
       await deleteFeedback(id);
@@ -171,6 +184,7 @@ const AdminDashboard = () => {
     }
   };
 
+  // Load selected feedback details + comments
   const fetchDetails = async (id) => {
     setDetailsLoading(true);
     try {
@@ -180,8 +194,10 @@ const AdminDashboard = () => {
       showToast("Failed to load details", "error");
     }
     setDetailsLoading(false);
+    // Note: not refetching list here; list is updated elsewhere when needed
   };
 
+  // Delete a specific comment; refresh details only
   const handleDeleteComment = async (feedbackId, commentId) => {
     try {
       await deleteComment(feedbackId, commentId);
@@ -192,6 +208,7 @@ const AdminDashboard = () => {
     }
   };
 
+  // One feedback card in the list (left column)
   const FeedbackCard = ({ fb }) => (
     <Box
       p={5}
@@ -235,6 +252,7 @@ const AdminDashboard = () => {
           {fb.status.toUpperCase()}
         </Badge>
       </HStack>
+
       <Text
         mt={2}
         mb={2}
@@ -245,10 +263,13 @@ const AdminDashboard = () => {
       >
         {fb.text || <i>No feedback text</i>}
       </Text>
+
       <HStack justify="space-between" mt={3}>
         <Text fontSize="sm" color={subTextColor}>
           {new Date(fb.createdAt).toLocaleString()}
         </Text>
+
+        {/* Stop click from also selecting the card */}
         <HStack onClick={(e) => e.stopPropagation()}>
           <Button
             size="sm"
@@ -258,6 +279,7 @@ const AdminDashboard = () => {
           >
             Details
           </Button>
+
           <ConfirmModal
             onConfirm={() => handleDeleteFeedback(fb._id)}
             title="Delete Feedback"
@@ -277,6 +299,7 @@ const AdminDashboard = () => {
     </Box>
   );
 
+  // Layout: left list + right details panel
   return (
     <Box
       maxW="1200px"
@@ -287,6 +310,7 @@ const AdminDashboard = () => {
       borderRadius="2xl"
       boxShadow="lg"
     >
+      {/* Header */}
       <HStack justify="space-between" mb={6}>
         <Heading size="lg" color="teal.500">
           Admin Dashboard
@@ -296,6 +320,7 @@ const AdminDashboard = () => {
         </Button>
       </HStack>
 
+      {/* Filters */}
       <HStack mb={6} spacing={4}>
         <Select
           placeholder="Filter by tag"
@@ -310,6 +335,7 @@ const AdminDashboard = () => {
             </option>
           ))}
         </Select>
+
         <Select
           placeholder="Filter by status"
           value={filterStatus}
@@ -323,6 +349,7 @@ const AdminDashboard = () => {
             </option>
           ))}
         </Select>
+
         <Button
           onClick={() => {
             setFilterTag("");
@@ -335,6 +362,7 @@ const AdminDashboard = () => {
         </Button>
       </HStack>
 
+      {/* Error alert */}
       {error && (
         <Alert status="error" mb={4} borderRadius="md">
           <AlertIcon />
@@ -342,11 +370,13 @@ const AdminDashboard = () => {
         </Alert>
       )}
 
+      {/* Two-column layout */}
       <Stack
         direction={{ base: "column", md: "row" }}
         spacing={8}
         align="flex-start"
       >
+        {/* Left: feedback list */}
         <Box flex="1" minW="350px">
           <Heading size="md" mb={4} color="teal.400">
             Feedback List
@@ -366,6 +396,7 @@ const AdminDashboard = () => {
           ) : (
             <Stack spacing={5}>
               {feedbacks.length === 0 ? (
+                // Empty state card
                 <Box
                   textAlign="center"
                   py={10}
@@ -391,6 +422,7 @@ const AdminDashboard = () => {
                       ? "Try adjusting your filters or clear them to see all feedback."
                       : "No feedback has been submitted yet."}
                   </Text>
+
                   {(filterTag || filterStatus) && (
                     <Button
                       mt={3}
@@ -413,6 +445,7 @@ const AdminDashboard = () => {
           )}
         </Box>
 
+        {/* Right: details pane */}
         <Box flex="2" minW="350px">
           <AnimatePresence mode="wait">
             {loading || detailsLoading ? (
@@ -442,6 +475,7 @@ const AdminDashboard = () => {
                   <Heading size="md" mb={3} color="blue.400">
                     Feedback Details
                   </Heading>
+
                   <HStack mb={2}>
                     {selected?.tags?.map((tag) => (
                       <Tag
@@ -466,6 +500,7 @@ const AdminDashboard = () => {
                       {selected.status.toUpperCase()}
                     </Badge>
                   </HStack>
+
                   <Text
                     mb={2}
                     fontSize="lg"
@@ -477,6 +512,8 @@ const AdminDashboard = () => {
                   <Text fontSize="sm" color={subTextColor}>
                     {new Date(selected.createdAt).toLocaleString()}
                   </Text>
+
+                  {/* Actions */}
                   <HStack mt={4} spacing={3}>
                     <Button
                       size="sm"
@@ -496,6 +533,8 @@ const AdminDashboard = () => {
                       Mark as Closed
                     </Button>
                   </HStack>
+
+                  {/* Comments */}
                   <Box mt={8}>
                     <Heading size="sm" mb={3} color="blue.400">
                       Comments
