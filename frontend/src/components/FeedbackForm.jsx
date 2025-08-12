@@ -1,3 +1,6 @@
+// FeedbackForm: lets users submit anonymous feedback (text + optional tags).
+// Shows inline errors and success toasts, and calls onSuccess after submit.
+
 import { useState } from "react";
 import {
   Box,
@@ -15,42 +18,55 @@ import {
 } from "@chakra-ui/react";
 import { createFeedback } from "../api/feedback";
 
+// Available tags to choose from
 const TAG_OPTIONS = ["bug", "feature", "ui", "performance", "other"];
 
 const FeedbackForm = ({ onSuccess }) => {
+  // Form state
   const [text, setText] = useState("");
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const toast = useToast();
 
+  // Add a tag if not already selected
   const handleAddTag = (tag) => {
     if (!tags.includes(tag)) setTags([...tags, tag]);
   };
 
+  // Remove a selected tag
   const handleRemoveTag = (tag) => {
     setTags(tags.filter((t) => t !== tag));
   };
 
+  // Submit handler: basic validation + API call + success/error UI
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    // Require some text
     if (!text.trim()) {
       setLoading(false);
       toast({ title: "Feedback text is required.", status: "error" });
       return;
     }
+
     try {
       await createFeedback({ text, tags });
+      // Reset form and notify
       setText("");
       setTags([]);
       toast({ title: "Feedback submitted!", status: "success" });
       if (onSuccess) onSuccess();
-      // eslint-disable-next-line no-unused-vars
     } catch (err) {
-      setError("Submission failed.");
-      toast({ title: "Submission failed.", status: "error" });
+      // Show AI/block or generic errors
+      if (err.message.includes("blocked")) {
+        setError(err.message);
+      } else {
+        setError("Submission failed.");
+        toast({ title: "Submission failed.", status: "error" });
+      }
     }
     setLoading(false);
   };
@@ -66,12 +82,15 @@ const FeedbackForm = ({ onSuccess }) => {
       align="center"
       justify="center"
     >
+      {/* Inline error alert */}
       {error && (
         <Alert status="error" mb={2}>
           <AlertIcon />
           {error}
         </Alert>
       )}
+
+      {/* Feedback text input */}
       <FormControl mb={3} isRequired>
         <FormLabel>Feedback</FormLabel>
         <Textarea
@@ -80,8 +99,12 @@ const FeedbackForm = ({ onSuccess }) => {
           placeholder="Share your feedback..."
         />
       </FormControl>
+
+      {/* Tags: selected + available */}
       <FormControl mb={3}>
         <FormLabel>Tags</FormLabel>
+
+        {/* Selected tags */}
         <HStack spacing={2} mb={2}>
           {tags.map((tag) => (
             <Tag key={tag} colorScheme="blue">
@@ -90,6 +113,8 @@ const FeedbackForm = ({ onSuccess }) => {
             </Tag>
           ))}
         </HStack>
+
+        {/* Tag choices (hide ones already selected) */}
         <HStack spacing={2}>
           {TAG_OPTIONS.filter((tag) => !tags.includes(tag)).map((tag) => (
             <Button key={tag} size="sm" onClick={() => handleAddTag(tag)}>
@@ -98,6 +123,8 @@ const FeedbackForm = ({ onSuccess }) => {
           ))}
         </HStack>
       </FormControl>
+
+      {/* Submit button with loading state */}
       <Button colorScheme="teal" type="submit" isLoading={loading}>
         Submit Anonymously
       </Button>
