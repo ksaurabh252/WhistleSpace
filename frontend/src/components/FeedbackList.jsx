@@ -1,3 +1,6 @@
+// Shows a list of feedback cards with loading skeletons, error state, and empty state.
+// Uses Chakra UI for styling and a small timeout to avoid skeleton flicker.
+
 import React, { useEffect, useRef, useState } from "react";
 import {
   Box,
@@ -13,28 +16,24 @@ import {
   SkeletonText,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { getFeedbacks } from "../api/feedback";
 import { Link } from "react-router-dom";
-import { getErrorMessage } from "../utils/errorHandler";
 import { keyframes } from "@emotion/react";
 
+import { getFeedbacks } from "../api/feedback";
+import { getErrorMessage } from "../utils/errorHandler";
+
+// Subtle breathing border animation for the empty state card
 const breathingAnimation = keyframes`
-  0% { 
-    border-color: var(--chakra-colors-teal-200);
-     box-shadow: 0 0 5px rgba(45, 212, 191, 0.2);
-  }
-  50% { 
-   border-color: var(--chakra-colors-teal-300);
-    box-shadow: 0 0 15px rgba(45, 212, 191, 0.4);
-  }
-  100% { 
-    border-color: var(--chakra-colors-teal-200);
-   box-shadow: 0 0 5px rgba(45, 212, 191, 0.2);
-  }
+  0% { border-color: var(--chakra-colors-teal-200); box-shadow: 0 0 5px rgba(45, 212, 191, 0.2); }
+  50% { border-color: var(--chakra-colors-teal-300); box-shadow: 0 0 15px rgba(45, 212, 191, 0.4); }
+  100% { border-color: var(--chakra-colors-teal-200); box-shadow: 0 0 5px rgba(45, 212, 191, 0.2); }
 `;
+
+// Skeleton card used while loading
 const FeedbackCardSkeleton = () => {
   const cardBg = useColorModeValue("white", "gray.800");
   const cardBorder = useColorModeValue("teal.200", "blue.400");
+
   return (
     <Box
       p={5}
@@ -58,33 +57,40 @@ const FeedbackCardSkeleton = () => {
 };
 
 const FeedbackList = () => {
+  // Data + UI state
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Keep references for aborting requests and clearing timeouts
   const abortControllerRef = useRef(null);
   const timeoutRef = useRef(null);
 
-  // Color mode values - same as AdminDashboard
+  // Theme-aware colors
   const cardBg = useColorModeValue("white", "gray.800");
   const cardBorder = useColorModeValue("teal.200", "blue.400");
   const textColor = useColorModeValue("gray.700", "gray.200");
   const subTextColor = useColorModeValue("gray.500", "gray.400");
 
+  // Fetch feedbacks with cancellation and basic error handling
   const fetchFeedbacks = async () => {
+    // Cancel any in-flight request
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
+
     setLoading(true);
     setError("");
+
     try {
       const res = await getFeedbacks({
         signal: abortControllerRef.current.signal,
       });
-
-      // FIXED: Same as AdminDashboard
       setFeedbacks(res.data || []);
-      setTimeout(() => setLoading(false), 150);
 
+      // Tiny delay so the skeleton doesn't flash too quickly
+      setTimeout(() => setLoading(false), 150);
     } catch (err) {
+      // Ignore abort/cancel errors; show others
       if (
         err.name !== "AbortError" &&
         err.message !== "canceled" &&
@@ -94,6 +100,7 @@ const FeedbackList = () => {
       }
       setLoading(false);
     } finally {
+      // Clear any global timeout if set
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -101,8 +108,11 @@ const FeedbackList = () => {
     }
   };
 
+  // On mount: load data and set a 10s safety timeout
   useEffect(() => {
     fetchFeedbacks();
+
+    // If request hangs, stop loading and show a helpful message
     timeoutRef.current = setTimeout(() => {
       if (loading) {
         setLoading(false);
@@ -112,6 +122,7 @@ const FeedbackList = () => {
       }
     }, 10000);
 
+    // Cleanup on unmount: abort requests and clear timers
     return () => {
       if (abortControllerRef.current) abortControllerRef.current.abort();
       if (timeoutRef.current) {
@@ -119,8 +130,10 @@ const FeedbackList = () => {
         timeoutRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Loading state: show 3 skeleton cards
   if (loading)
     return (
       <Stack spacing={5}>
@@ -130,6 +143,7 @@ const FeedbackList = () => {
       </Stack>
     );
 
+  // Error state with retry button
   if (error) {
     return (
       <Alert status="error" borderRadius="md">
@@ -142,10 +156,11 @@ const FeedbackList = () => {
     );
   }
 
+  // Main content: empty state or list of feedback cards
   return (
     <Stack spacing={5}>
-      {/* FIXED: Same styled empty state as AdminDashboard */}
       {feedbacks.length === 0 ? (
+        // Empty state card
         <Box
           textAlign="center"
           py={10}
@@ -174,6 +189,7 @@ const FeedbackList = () => {
           </Text>
         </Box>
       ) : (
+        // Feedback list
         feedbacks.map((fb) => (
           <Box
             key={fb._id}
@@ -192,6 +208,7 @@ const FeedbackList = () => {
           >
             <HStack justify="space-between" mb={2}>
               <HStack>
+                {/* Assuming fb.tags is an array */}
                 {fb.tags.map((tag) => (
                   <Tag
                     key={tag}
@@ -206,6 +223,7 @@ const FeedbackList = () => {
                   </Tag>
                 ))}
               </HStack>
+
               <Badge
                 colorScheme={fb.status === "resolved" ? "green" : "orange"}
                 fontSize="0.9em"
@@ -216,6 +234,7 @@ const FeedbackList = () => {
                 {fb.status.toUpperCase()}
               </Badge>
             </HStack>
+
             <Text
               mt={2}
               mb={2}
@@ -226,6 +245,7 @@ const FeedbackList = () => {
             >
               {fb.text}
             </Text>
+
             <HStack justify="space-between" mt={3}>
               <Text fontSize="sm" color={subTextColor}>
                 {new Date(fb.createdAt).toLocaleString()}
