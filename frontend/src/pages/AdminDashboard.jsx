@@ -1,7 +1,7 @@
 // Admin Dashboard: view, filter, update, and delete feedback and comments.
 // Uses Chakra UI for styling and Framer Motion for smooth detail transitions.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import {
   Box,
   Heading,
@@ -32,7 +32,7 @@ import {
   deleteComment,
 } from "../api/admin";
 import { useAdminAuth } from "../context/AdminAuthContext";
-import ConfirmModal from "../components/ConfirmModal";
+const ConfirmModal = lazy(() => import("../components/ConfirmModal"));
 import { getErrorMessage, handleApiError } from "../utils/errorHandler";
 
 // Motion wrapper for animated detail panel
@@ -280,20 +280,22 @@ const AdminDashboard = () => {
             Details
           </Button>
 
-          <ConfirmModal
-            onConfirm={() => handleDeleteFeedback(fb._id)}
-            title="Delete Feedback"
-            body="Are you sure? This action cannot be undone."
-          >
-            <Button
-              size="sm"
-              colorScheme="red"
-              leftIcon={<DeleteIcon />}
-              variant="outline"
+          <Suspense fallback={<Button size="sm" colorScheme="red" variant="outline" leftIcon={<DeleteIcon />} isLoading>Delete</Button>}>
+            <ConfirmModal
+              onConfirm={() => handleDeleteFeedback(fb._id)}
+              title="Delete Feedback"
+              body="Are you sure? This action cannot be undone."
             >
-              Delete
-            </Button>
-          </ConfirmModal>
+              <Button
+                size="sm"
+                colorScheme="red"
+                leftIcon={<DeleteIcon />}
+                variant="outline"
+              >
+                Delete
+              </Button>
+            </ConfirmModal>
+          </Suspense>
         </HStack>
       </HStack>
     </Box>
@@ -568,20 +570,20 @@ const AdminDashboard = () => {
                               <Text fontSize="xs" color={subTextColor}>
                                 {new Date(c.createdAt).toLocaleString()}
                               </Text>
-                              <ConfirmModal
-                                onConfirm={() =>
-                                  handleDeleteComment(selected._id, c._id)
-                                }
-                                title="Delete Comment"
-                                body="Are you sure? This action cannot be undone."
-                              >
-                                <IconButton
-                                  size="xs"
-                                  colorScheme="red"
-                                  icon={<DeleteIcon />}
-                                  variant="ghost"
-                                />
-                              </ConfirmModal>
+                              <Suspense fallback={<IconButton size="xs" colorScheme="red" icon={<DeleteIcon />} variant="ghost" isLoading />}>
+                                <ConfirmModal
+                                  onConfirm={() => handleDeleteComment(selected._id, c._id)}
+                                  title="Delete Comment"
+                                  body="Are you sure? This action cannot be undone."
+                                >
+                                  <IconButton
+                                    size="xs"
+                                    colorScheme="red"
+                                    icon={<DeleteIcon />}
+                                    variant="ghost"
+                                  />
+                                </ConfirmModal>
+                              </Suspense>
                             </HStack>
                           </Box>
                         ))
